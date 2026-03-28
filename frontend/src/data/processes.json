@@ -1,0 +1,5 @@
+{
+  "home_loan": ["KYC Verification", "Income Assessment", "Property Documents", "Valuation", "Sanction Letter"],
+  "account_opening": ["Fill Application", "KYC Documents", "Initial Deposit", "Debit Card Issue", "Internet Banking Setup"],
+  "kyc_update": ["Aadhaar Verification", "PAN Verification", "Address Proof", "Photo Update", "Biometric"]
+}

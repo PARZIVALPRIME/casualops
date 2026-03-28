@@ -1,0 +1,6 @@
+/* Root index.css - reset only */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}

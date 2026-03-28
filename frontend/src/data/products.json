@@ -1,0 +1,31 @@
+{
+  "home_loan": {
+    "name": "UBI Ghar Sathi Home Loan",
+    "rate": "8.35% p.a.",
+    "max": "10 Crore",
+    "tenure": "30 years",
+    "fee": "0.50%"
+  },
+  "fixed_deposit": {
+    "name": "UBI Fixed Deposit",
+    "rate": "7.25% p.a. (Senior: 7.75%)",
+    "min": "1,000",
+    "tenure": "7 days to 10 years"
+  },
+  "savings_account": {
+    "name": "UBI Savings Account",
+    "rate": "2.70% p.a.",
+    "min_balance": "500 (rural) / 1000 (urban)"
+  },
+  "personal_loan": {
+    "name": "UBI Personal Loan",
+    "rate": "10.50% p.a.",
+    "max": "20 Lakh",
+    "tenure": "5 years"
+  },
+  "pmay": {
+    "name": "PMAY - Pradhan Mantri Awas Yojana",
+    "subsidy": "Up to 2.67 Lakh",
+    "category": "EWS/LIG/MIG"
+  }
+}
