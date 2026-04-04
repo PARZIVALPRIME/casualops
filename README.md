@@ -1,68 +1,56 @@
-# Frontline Banking Assistant Architecture
+# 🔮 CausalOps: The Causal Inference Gym
 
-A production-ready, multilingual Gen-AI voice assistant crafted for Union Bank of India (UBI). This project delivers a comprehensive, intelligent, and highly secure voice banking experience, featuring a multi-agent LangGraph system with agentic RAG, consensus-based verification, and a robust 4-layer voice security shield.
+> **"Where right answers for wrong reasons score zero."**
 
-## Key Features
+Most AI benchmarks test *action selection* (what should I do next?). CausalOps is the first OpenEnv benchmark that tests **Causal Discovery** under pressure. 
 
-- **Multilingual Gen-AI Voice Assistant:** Seamlessly understands and communicates in multiple Indian languages, breaking down language barriers for banking customers.
-- **Multi-Agent LangGraph System:** Employs advanced LangGraph architecture to handle complex, multi-step banking queries by coordinating specialized AI agents.
-- **Agentic RAG (Retrieval-Augmented Generation):** Fetches real-time, context-specific banking policies and user data to ground AI responses accurately.
-- **Consensus-Based Verification:** Ensures extreme accuracy in transactions and critical information by requiring consensus among verifying AI agents before executing actions.
-- **4-Layer Voice Security Shield:** Protects user data and prevents voice spoofing/deepfakes using state-of-the-art multi-factor voice authentication and liveness detection.
-- **Premium React/TypeScript Frontend:** A sleek, dynamic UI featuring real-time audio visualization and contextual banking components, delivering a world-class user experience.
+It drops agents into simulated production systems experiencing cascading failures. But the environment is actively adversarial. We plant **Phantom Causes**—highly correlated metrics that have absolutely nothing to do with the outage—designed specifically to trap pattern-matching LLMs.
 
-## Tech Stack
+To win, agents must:
+1. Diagnose root causes through partial observability and information costs.
+2. Resist planted false correlations (Simpson's Paradox, temporal confounding).
+3. Commit to **falsifiable counterfactual predictions** before applying fixes.
 
-### Frontend
-- **Framework:** React / Vite
-- **Language:** TypeScript
-- **Styling:** CSS3, Tailwind CSS (if applicable)
-- **Features:** Real-time audio visualization, dynamic banking UI components.
+## 🪤 The Core Mechanic: Phantom Causality
 
-### Backend
-- **Language:** Python
-- **Framework:** FastAPI
-- **AI/Agents:** LangGraph, LangChain, OpenAI / specialized LLMs
-- **Audio Processing:** Real-time speech-to-text (STT) and text-to-speech (TTS) integration.
+Current frontier models suffer from confounding bias. CausalOps exploits this. Every scenario is backed by a hidden Directed Acyclic Graph (DAG). 
 
-## Project Structure
-
-- `/frontend`: Contains the React/TypeScript frontend application.
-- `/backend`: Contains the Python FastAPI backend, LangGraph agents, and integration logic.
-- `start.bat`: A quick-start batch script for launching both frontend and backend development servers on Windows.
-
-## Getting Started
-
-### Prerequisites
-- Node.js (for frontend)
-- Python 3.10+ (for backend)
-
-### Running Locally (Windows)
-
-To start both the frontend and backend simultaneously, you can use the provided batch script:
-
-```cmd
-start.bat
+```text
+[Load Spike] ──→ [Memory Pressure] ──→ [OOM Kills] ──→ [Service Crash]
+      │                                                        │
+      └──→ [DNS Latency ↑]              [Cascading Timeouts] ←┘
+           (PHANTOM — NOT CAUSAL)
 ```
+An agent that pattern-matches will investigate DNS, wasting time and losing points. An agent that uses true causal discovery will ignore DNS, identify the memory leak, and earn a maximum score.
 
-This script will:
-1. Start the frontend React development server at `http://localhost:3000`
-2. Start the backend Python server at `http://localhost:8000` (Make sure your virtual environment `venv` is set up correctly in the parent directory or modifying the path accordingly).
+## 📊 Deterministic Grading (No LLM-in-the-loop)
 
-### Manual Setup
-**Backend Setup:**
+Evaluation is 100% deterministic graph-matching. Final score (0.0 to 1.0) is a weighted sum:
+* **Causal Chain (40%)**: DAG graph-matching F1 score (strict phantom penalties).
+* **Remediation (25%)**: Did the fix work + time bonus.
+* **Counterfactual (15%)**: Accuracy of falsifiable predictions.
+* **Efficiency (10%)**: Information acquisition cost efficiency.
+* **Communication (10%)**: Stakeholder interaction quality.
+
+## 🛠️ Tasks
+
+| Task ID | Difficulty | Scenario | Causal Complexity |
+|---|---|---|---|
+| `easy_smoking_gun` | Easy | Single service crash | Linear chain. No phantoms. |
+| `medium_web_of_lies` | Medium | Cascading API failures | Branching DAG. 1 Phantom cause. |
+| `hard_shape_shifter` | Hard | Cache-thrashing feedback loop | Regime change, 2 Phantoms, Simpson's paradox. |
+
+## 🚀 Quick Start
+
+**1. Run the Environment (Docker / Hugging Face Spaces)**
 ```bash
-cd backend
-pip install -r requirements.txt
-python main.py
+docker build -t causal_ops .
+docker run -p 7860:7860 causal_ops
 ```
 
-**Frontend Setup:**
+**2. Test the Baseline Agent**
+Our included inference script strictly follows OpenEnv `[START]`, `[STEP]`, `[END]` standards.
 ```bash
-cd frontend
-npm install
-npm run dev
+export OPENAI_API_KEY="your-key"
+python inference.py --task medium_web_of_lies --model gpt-4o
 ```
-
-## Security
-This application is designed with bank-grade security considerations, utilizing a proprietary 4-Layer Voice Security Shield to defend against prompt injection, voice spoofing, and unauthorized access.

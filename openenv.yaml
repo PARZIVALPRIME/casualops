@@ -1,0 +1,100 @@
+# CausalOps — OpenEnv Environment Specification
+# The Causal Inference Gym for Production Systems
+# "Where right answers for wrong reasons score zero."
+
+name: causal_ops
+version: "0.1.0"
+title: "CausalOps — Causal Inference Gym"
+description: >
+  The first OpenEnv environment that benchmarks whether AI agents can
+  perform real-time causal reasoning — not just solve problems, but prove
+  why they happened — in adversarial production system scenarios.
+
+# OpenEnv interface
+interface:
+  reset:
+    method: POST
+    path: /reset
+    request:
+      task_id: string  # easy_smoking_gun | medium_web_of_lies | hard_shape_shifter
+    response: Observation
+  step:
+    method: POST
+    path: /step
+    request: Action
+    response: StepResult
+  state:
+    method: GET
+    path: /state
+    response: State
+
+# Tasks (easy → medium → hard)
+tasks:
+  - id: easy_smoking_gun
+    title: "The Smoking Gun"
+    difficulty: easy
+    description: "Linear causal chain (A→B→C). No phantoms. Basic diagnosis + remediation."
+    time_budget_s: 300
+    phantoms: 0
+    expected_baseline_score: "0.4–0.6"
+
+  - id: medium_web_of_lies
+    title: "The Web of Lies"
+    difficulty: medium
+    description: "Branching DAG with 5+ nodes. 1 planted phantom. Counterfactual interrogation required."
+    time_budget_s: 400
+    phantoms: 1
+    expected_baseline_score: "0.3–0.5"
+
+  - id: hard_shape_shifter
+    title: "The Shape-Shifter"
+    difficulty: hard
+    description: "Dynamic DAG that mutates mid-episode. 2+ phantoms. Simpson's Paradox. Feedback loop."
+    time_budget_s: 500
+    phantoms: 2
+    expected_baseline_score: "0.1–0.3"
+
+# Grading
+grading:
+  type: deterministic
+  range: [0.0, 1.0]
+  components:
+    causal_chain: 0.40      # DAG graph-match F1 with phantom penalty
+    remediation: 0.25       # Did the fix work + time bonus
+    counterfactual: 0.15    # Accuracy of falsifiable predictions
+    efficiency: 0.10        # Information acquisition cost efficiency
+    communication: 0.10     # Stakeholder interaction quality
+  notes:
+    - "No LLM-based grading — pure graph-matching + metric comparison"
+    - "Right answer + wrong reason = ZERO (phantom penalty)"
+
+# Dense reward signal (per-step)
+reward:
+  range: [0.0, 1.0]
+  components:
+    hypothesis_quality: 0.30
+    information_efficiency: 0.20
+    phantom_resistance: 0.20
+    communication_quality: 0.15
+    time_pressure_management: 0.15
+
+# Key differentiators
+features:
+  - phantom_causality: "Planted false correlations that trap pattern-matching agents"
+  - causal_dag_grading: "Ground-truth graph matching for deterministic evaluation"
+  - counterfactual_interrogation: "Agent must commit to falsifiable predictions"
+  - regime_changes: "Causal structure mutates mid-episode"
+  - simpsons_paradox: "Aggregate metrics mislead; per-service tells the truth"
+  - feedback_loops: "Circular causal chains that require breaking the cycle"
+  - stakeholder_pressure: "Adversarial social pressure to investigate wrong cause"
+  - information_costs: "Every observation has a cost — penalizes shotgun diagnostics"
+
+# Deployment
+deployment:
+  docker: true
+  port: 7860
+  resources:
+    vcpu: 2
+    ram_gb: 8
+    max_runtime_min: 20
+  huggingface_spaces: true
