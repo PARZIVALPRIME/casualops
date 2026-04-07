@@ -22,12 +22,18 @@ def compute_step_reward(
     # 1. Hypothesis Quality (0.0 to 0.30)
     if action_type == "hypothesize":
         parts = action_target.split("->")
-        if len(parts) == 2 and dag.has_edge(parts[0].strip(), parts[1].strip()):
-            comp.hypothesis_quality = 0.30
-            explanation.append("Correct causal hypothesis (+0.30)")
-        else:
-            comp.hypothesis_quality = 0.0
-            explanation.append("Incorrect causal hypothesis (+0.0)")
+        if len(parts) == 2:
+            src, tgt = parts[0].strip(), parts[1].strip()
+            # Check if it's a real edge and NOT a planted phantom trap
+            is_real = dag.has_edge(src, tgt)
+            is_trap = any(p.correlated_node == src and p.phantom_node == tgt for p in traps.phantoms)
+            
+            if is_real and not is_trap:
+                comp.hypothesis_quality = 0.30
+                explanation.append("Correct causal hypothesis (+0.30)")
+            else:
+                comp.hypothesis_quality = 0.0
+                explanation.append("Incorrect or phantom causal hypothesis (+0.0)")
     
     # 2. Information Efficiency (0.0 to 0.20)
     if action_type == "observe":

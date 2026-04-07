@@ -98,7 +98,7 @@ def main():
         try:
             response = client.chat.completions.create(
                 model=model_name,
-                messages=messages,
+                messages=messages, # type: ignore
                 temperature=0.0
             )
             ai_text = response.choices[0].message.content or ""
