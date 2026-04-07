@@ -19,11 +19,13 @@ def compute_final_score(
     for h in agent.hypotheses:
         agent_edges.add(Edge(source=h.cause, target=h.effect))
     
-    true_edges = set(dag.edges)
+    trap_edges = set(Edge(source=p.correlated_node, target=p.phantom_node) for p in traps.phantoms)
+    
+    true_edges = set(dag.edges) - trap_edges
     critical_edges = set(dag.critical_path)
     
     correct_edges = agent_edges & true_edges
-    phantom_edges = agent_edges - true_edges
+    phantom_edges = (agent_edges - true_edges) | (agent_edges & trap_edges)
     
     precision = len(correct_edges) / max(len(agent_edges), 1)
     recall = len(correct_edges) / max(len(critical_edges), 1)
