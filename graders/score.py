@@ -27,9 +27,13 @@ def compute_final_score(
     correct_edges = agent_edges & true_edges
     phantom_edges = (agent_edges - true_edges) | (agent_edges & trap_edges)
     
-    precision = len(correct_edges) / max(len(agent_edges), 1)
-    recall = len(correct_edges) / max(len(critical_edges), 1)
-    phantom_penalty = len(phantom_edges) / max(len(agent_edges), 1)
+    precision = min(1.0, len(correct_edges) / max(len(agent_edges), 1))
+    
+    # Recall should only count edges that are in the critical path
+    correct_critical = agent_edges & critical_edges
+    recall = min(1.0, len(correct_critical) / max(len(critical_edges), 1))
+    
+    phantom_penalty = min(1.0, len(phantom_edges) / max(len(agent_edges), 1))
     
     if precision + recall > 0:
         f1 = (2 * precision * recall) / (precision + recall)
