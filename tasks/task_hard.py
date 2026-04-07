@@ -34,8 +34,8 @@ class HardTask(BaseTask):
     def build_traps(self) -> ScenarioTraps:
         # 2 Phantoms: CDN latency and Cron job spikes
         return ScenarioTraps(phantoms=[
-            Phantom(phantom_node="cdn_latency", correlated_node="inventory-db"),
-            Phantom(phantom_node="cron_job_spike", correlated_node="search-api")
+            Phantom(phantom_node="cdn", correlated_node="inventory-db"),
+            Phantom(phantom_node="worker-svc", correlated_node="search-api")
         ])
 
     def initial_services(self) -> Dict[str, ServiceMetrics]:

@@ -22,3 +22,4 @@ venv/
 dist/
 build/
 *.log
+*.egg-info/

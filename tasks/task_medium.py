@@ -36,7 +36,7 @@ class MediumTask(BaseTask):
         # but DNS is NOT causing the service failures. 
         # Here we correlate it to 'user-db' to make it temporal.
         return ScenarioTraps(phantoms=[
-            Phantom(phantom_node="dns_latency", correlated_node="user-db")
+            Phantom(phantom_node="dns-resolver", correlated_node="user-db")
         ])
 
     def initial_services(self) -> Dict[str, ServiceMetrics]:
