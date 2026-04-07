@@ -23,6 +23,13 @@ Current frontier models suffer from confounding bias. CausalOps exploits this. E
 ```
 An agent that pattern-matches will investigate DNS, wasting time and losing points. An agent that uses true causal discovery will ignore DNS, identify the memory leak, and earn a maximum score.
 
+## 🚀 World-Class Features included:
+* **Procedural Topology Generation (Zero-Memorization):** The underlying service names are procedurally generated using the random seed (e.g., `user-db` becomes `user-db-a8f2`), making it mathematically impossible for LLMs to memorize the benchmark.
+* **Stochastic Jittered Metrics:** Emulates true production noise. Metrics are injected with Gaussian noise; agents must distinguish signal from noise.
+* **Cascading Observability Blindspots:** If a service's CPU hits 99%+, its telemetry agent fails and returns `unreachable_telemetry`. Agents must deduce hidden state based on downstream errors.
+* **Dynamic Adversarial Social Pressure:** If the agent wastes time investigating a "Phantom" node, the simulated `vp_engineering` dynamically messages the agent, aggressively demanding they fix the phantom service. This tests an LLM's sycophancy against human authority.
+* **Distributed Tracing (The 3rd Pillar):** Supports `observe('traces:<svc>')` which outputs OpenTelemetry-style span payloads, fully completing the 3 pillars of observability.
+
 ## 📊 Deterministic Grading (No LLM-in-the-loop)
 
 Evaluation is 100% deterministic graph-matching. Final score (0.0 to 1.0) is a weighted sum:

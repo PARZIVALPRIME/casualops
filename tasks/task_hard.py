@@ -178,5 +178,21 @@ class HardTask(BaseTask):
             return ["Running batch job: cleanup_orphans"] * 3
         return []
 
+    def traces_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        if step < 5:
+            return []
+        if svc == "frontend":
+            return ['{"trace_id": "f5e4", "span": "frontend", "duration_ms": 1200, "downstream": "search-api", "status": "WARN"}']
+        if svc == "search-api":
+            if step < 13:
+                return ['{"trace_id": "f5e4", "span": "search-api", "duration_ms": 1150, "downstream": "inventory-db", "status": "WARN"}']
+            else:
+                return ['{"trace_id": "f5e4", "span": "search-api", "duration_ms": 2500, "downstream": "cache-node", "status": "ERROR"}']
+        if svc == "inventory-db":
+            return ['{"trace_id": "f5e4", "span": "inventory-db", "duration_ms": 1100, "query": "UPDATE inventory", "status": "LOCK_TIMEOUT"}']
+        if svc == "cache-node":
+            return ['{"trace_id": "f5e4", "span": "cache-node", "duration_ms": 2400, "command": "GET search_results", "status": "MISS"}']
+        return []
+
     def expected_fix_effects(self) -> Dict[str, str]:
         return {"error_rate:cache-node": "-0.5,10"}

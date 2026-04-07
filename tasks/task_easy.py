@@ -106,6 +106,17 @@ class EasyTask(BaseTask):
             return ['WARN: slow query detected', 'ERROR: max connections reached'] * 2
         return []
 
+    def traces_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        if step < 3:
+            return []
+        if svc == "load-balancer":
+            return ['{"trace_id": "a1b2", "span": "load-balancer", "duration_ms": 3050, "status": "ERROR"}']
+        if svc == "app-server":
+            return ['{"trace_id": "a1b2", "span": "app-server", "duration_ms": 3000, "downstream": "database", "status": "ERROR"}']
+        if svc == "database":
+            return ['{"trace_id": "a1b2", "span": "database", "duration_ms": 3000, "query": "SELECT *", "status": "TIMEOUT"}']
+        return []
+
     def expected_fix_effects(self) -> Dict[str, str]:
         # "If this fix works, what metric should change first, by how much, and in what timeframe?"
         return {"latency_ms:database": "-400.0,30"}

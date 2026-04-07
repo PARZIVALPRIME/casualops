@@ -60,3 +60,7 @@ class BaseTask(ABC):
         Format: {"<metric>:<service>": "expected_change"}
         """
         pass
+
+    def traces_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        """Generate OpenTelemetry-style trace spans for a specific service."""
+        return []

@@ -157,5 +157,18 @@ class MediumTask(BaseTask):
             return ['WARN: resolver queue full', 'Query taking > 200ms'] * 2
         return []
 
+    def traces_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        if step < 4:
+            return []
+        if svc == "api-gateway":
+            return ['{"trace_id": "c9d8", "span": "api-gateway", "duration_ms": 1500, "downstream": "auth-service", "status": "ERROR"}']
+        if svc == "auth-service":
+            return ['{"trace_id": "c9d8", "span": "auth-service", "duration_ms": 1490, "downstream": "user-db", "status": "ERROR"}']
+        if svc == "user-db":
+            return ['{"trace_id": "c9d8", "span": "user-db", "duration_ms": 1450, "query": "SELECT user_profiles", "status": "OOM_KILLED"}']
+        if svc == "payment-gateway":
+            return ['{"trace_id": "x7y6", "span": "payment-gateway", "duration_ms": 2000, "downstream": "auth-service", "status": "ERROR"}']
+        return []
+
     def expected_fix_effects(self) -> Dict[str, str]:
         return {"latency_ms:user-db": "-500.0,20"}
