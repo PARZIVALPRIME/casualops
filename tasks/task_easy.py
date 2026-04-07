@@ -117,6 +117,11 @@ class EasyTask(BaseTask):
             return ['{"trace_id": "a1b2", "span": "database", "duration_ms": 3000, "query": "SELECT *", "status": "TIMEOUT"}']
         return []
 
+    def config_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        if svc == "database":
+            return ["No recent deployments."]
+        return ["No recent deployments."]
+
     def expected_fix_effects(self) -> Dict[str, str]:
         # "If this fix works, what metric should change first, by how much, and in what timeframe?"
         return {"latency_ms:database": "-400.0,30"}

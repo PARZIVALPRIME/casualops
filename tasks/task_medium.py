@@ -170,5 +170,12 @@ class MediumTask(BaseTask):
             return ['{"trace_id": "x7y6", "span": "payment-gateway", "duration_ms": 2000, "downstream": "auth-service", "status": "ERROR"}']
         return []
 
+    def config_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        if svc == "dns-resolver":
+            return ["Deployment 5 mins ago: Update corefile records (commit: 9a8b7c)"]
+        if svc == "user-db":
+            return ["No recent deployments."]
+        return ["No recent deployments."]
+
     def expected_fix_effects(self) -> Dict[str, str]:
         return {"latency_ms:user-db": "-500.0,20"}

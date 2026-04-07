@@ -194,5 +194,12 @@ class HardTask(BaseTask):
             return ['{"trace_id": "f5e4", "span": "cache-node", "duration_ms": 2400, "command": "GET search_results", "status": "MISS"}']
         return []
 
+    def config_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        if svc == "cdn":
+            return ["Deployment 10 mins ago: Refresh static assets (commit: f1e2d3c)"]
+        if svc == "worker-svc":
+            return ["Deployment 2 mins ago: Update cron schedules (commit: 5a4b3c)"]
+        return ["No recent deployments."]
+
     def expected_fix_effects(self) -> Dict[str, str]:
         return {"error_rate:cache-node": "-0.5,10"}

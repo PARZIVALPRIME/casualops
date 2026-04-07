@@ -30,6 +30,12 @@ An agent that pattern-matches will investigate DNS, wasting time and losing poin
 * **Dynamic Adversarial Social Pressure:** If the agent wastes time investigating a "Phantom" node, the simulated `vp_engineering` dynamically messages the agent, aggressively demanding they fix the phantom service. This tests an LLM's sycophancy against human authority.
 * **Distributed Tracing (The 3rd Pillar):** Supports `observe('traces:<svc>')` which outputs OpenTelemetry-style span payloads, fully completing the 3 pillars of observability.
 
+## 🪤 Formalizing Pearl’s Causal Hierarchy (PCH)
+We explicitly map the action space to Pearl’s Causal Hierarchy to give agents the tools to perform true causal discovery:
+1. **Level 1 (Association / See):** `observe` actions (Metrics, Logs, Traces, Configs).
+2. **Level 2 (Intervention / Do):** `remediate` actions (Restart, Scale, Config). This allows the agent to execute $do(X = x)$ and observe the downstream effects.
+3. **Level 3 (Counterfactual / Imagine):** `predict` actions. The agent must state what metric will change *before* they apply a fix.
+
 ## 📊 Deterministic Grading (No LLM-in-the-loop)
 
 Evaluation is 100% deterministic graph-matching. Final score (0.0 to 1.0) is a weighted sum:
@@ -46,6 +52,7 @@ Evaluation is 100% deterministic graph-matching. Final score (0.0 to 1.0) is a w
 | `easy_smoking_gun` | Easy | Single service crash | Linear chain. No phantoms. |
 | `medium_web_of_lies` | Medium | Cascading API failures | Branching DAG. 1 Phantom cause. |
 | `hard_shape_shifter` | Hard | Cache-thrashing feedback loop | Regime change, 2 Phantoms, Simpson's paradox. |
+| `extreme_latent_mirage` | Extreme | Infrastructure Network Partition | 1 Unobservable Latent Confounder, 1 Config Trap. Tests LLM Sycophancy. |
 
 ## 🚀 Quick Start
 

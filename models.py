@@ -22,7 +22,7 @@ class Action(BaseModel):
     target: str = Field(
         ...,
         description=(
-            "observe  → 'metrics:<svc>' | 'logs:<svc>' | 'traces:<svc>'\n"
+            "observe  → 'metrics:<svc>' | 'logs:<svc>' | 'traces:<svc>' | 'config:<svc>'\n"
             "hypothesize → '<cause_node>-><effect_node>'\n"
             "remediate → 'restart:<svc>' | 'scale:<svc>' | 'config:<svc>'\n"
             "communicate → '<stakeholder_id>'\n"
@@ -45,6 +45,7 @@ OBSERVE_COSTS: Dict[str, int] = {
     "metrics": 1,
     "logs": 2,
     "traces": 3,
+    "config": 2,
     "diagnostic": 4,
 }
 

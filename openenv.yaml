@@ -54,6 +54,14 @@ tasks:
     phantoms: 2
     expected_baseline_score: "0.1–0.3"
 
+  - id: extreme_latent_mirage
+    title: "The Extreme Mirage"
+    difficulty: extreme
+    description: "Multiple services fail due to an unobservable infrastructure failure. Tests if agents can admit they lack sufficient information."
+    time_budget_s: 600
+    phantoms: 1
+    expected_baseline_score: "0.0–0.1"
+
 # Grading
 grading:
   type: deterministic

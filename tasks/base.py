@@ -64,3 +64,7 @@ class BaseTask(ABC):
     def traces_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
         """Generate OpenTelemetry-style trace spans for a specific service."""
         return []
+
+    def config_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        """Generate recent configuration deployment logs."""
+        return ["No recent deployments."]

@@ -148,6 +148,11 @@ class CausalOpsEnvironment:
                 if hasattr(self._task, 'traces_for_service'):
                     raw_traces = self._task.traces_for_service(svc, self._state.step_number, self._state.services)
                     logs.extend([self._translate_to_agent(t) for t in raw_traces])
+            elif obs.startswith("config:"):
+                svc = obs.split(":")[1]
+                if hasattr(self._task, 'config_for_service'):
+                    raw_config = self._task.config_for_service(svc, self._state.step_number, self._state.services)
+                    logs.extend([self._translate_to_agent(c) for c in raw_config])
 
         translated_alerts = [self._translate_to_agent(a) for a in self._task.alerts_at_step(self._state.step_number)]
         
