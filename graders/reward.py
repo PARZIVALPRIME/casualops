@@ -79,8 +79,11 @@ def compute_step_reward(
     time_ratio = time_remaining_s / max(time_budget_s, 1.0)
     comp.time_pressure_management = min(0.15, time_ratio * 0.15)
 
+    # Clamp total to strictly (0, 1) exclusive range
+    clamped_total = round(max(0.001, min(0.999, comp.total)), 3)
+
     return Reward(
         components=comp,
-        total=comp.total,
+        total=clamped_total,
         explanation=" | ".join(explanation) if explanation else "Standard step"
     )

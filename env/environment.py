@@ -177,9 +177,14 @@ class CausalOpsEnvironment(Environment):
                 requires_prediction=counterfactual_prompt.requires_prediction
             )
 
+        # Clamp reward to strictly (0, 1) exclusive when present
+        clamped_reward = reward
+        if clamped_reward is not None:
+            clamped_reward = round(max(0.001, min(0.999, float(clamped_reward))), 3)
+
         return CausalOpsObservation(
             done=done,
-            reward=reward,
+            reward=clamped_reward,
             task_id=self._task_id,
             step_number=self._state.step_number,
             time_elapsed_s=self._state.time_elapsed_s,
