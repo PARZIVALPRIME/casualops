@@ -94,6 +94,7 @@ class CounterfactualPrompt(BaseModel):
 
 
 class Observation(BaseModel):
+    task_id: str = ""
     step_number: int
     time_elapsed_s: float
     time_budget_remaining_s: float

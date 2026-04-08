@@ -174,6 +174,7 @@ class CausalOpsEnvironment:
             )
                 
         return Observation(
+            task_id=self._task_id,
             step_number=self._state.step_number,
             time_elapsed_s=self._state.time_elapsed_s,
             time_budget_remaining_s=self._state.time_budget_s - self._state.time_elapsed_s,
