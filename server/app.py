@@ -1,20 +1,22 @@
 """FastAPI layer for CausalOps OpenEnv environment.
 
 Thin HTTP wrapper — all logic lives in env/environment.py.
-Endpoints:
-  POST /reset          — start a new episode
-  POST /step           — submit an action
-  GET  /state          — get full state
-  GET  /tasks          — list available tasks
-  GET  /health         — health check
+Returns responses in OpenEnv-compatible format:
+  POST /reset  → {observation: {...}, reward: null, done: false}
+  POST /step   → {observation: {...}, reward: float, done: bool}
+  GET  /state  → State
+  GET  /tasks  → task list
+  GET  /health → health check
 """
 from __future__ import annotations
+
+from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from env import CausalOpsEnvironment
-from models import Action, Observation, State, StepResult
+from models import Action, Observation, State
 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -46,27 +48,54 @@ _env = CausalOpsEnvironment()
 class ResetRequest(BaseModel):
     task_id: str = "easy_smoking_gun"
     seed: int | None = None
+    episode_id: str | None = None
+
+
+# ── OpenEnv-compatible response models ───────────────────────────
+class OpenEnvResetResponse(BaseModel):
+    observation: Dict[str, Any]
+    reward: Optional[float] = None
+    done: bool = False
+
+
+class OpenEnvStepResponse(BaseModel):
+    observation: Dict[str, Any]
+    reward: Optional[float] = None
+    done: bool = False
+
+
+def _serialize_observation(obs: Observation) -> Dict[str, Any]:
+    """Serialize observation, excluding done/reward/metadata (OpenEnv convention)."""
+    return obs.model_dump(exclude={"done", "reward", "metadata"})
 
 
 # ── Endpoints ────────────────────────────────────────────────────
-@app.post("/reset", response_model=Observation)
-def reset(req: ResetRequest | None = None) -> Observation:
+@app.post("/reset", response_model=OpenEnvResetResponse)
+def reset(req: ResetRequest | None = None) -> OpenEnvResetResponse:
     """Initialize a new episode for the given task."""
     if req is None:
         req = ResetRequest()
     try:
         obs = _env.reset(req.task_id, seed=req.seed)
-        return obs
+        return OpenEnvResetResponse(
+            observation=_serialize_observation(obs),
+            reward=None,
+            done=False,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/step", response_model=StepResult)
-def step(action: Action) -> StepResult:
+@app.post("/step", response_model=OpenEnvStepResponse)
+def step(action: Action) -> OpenEnvStepResponse:
     """Execute one agent action and advance the environment."""
     try:
         result = _env.step(action)
-        return result
+        return OpenEnvStepResponse(
+            observation=_serialize_observation(result.observation),
+            reward=result.reward.total,
+            done=result.done,
+        )
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -114,36 +143,35 @@ def index():
     </head>
     <body>
         <div class="container">
-            <h1>🔮 CausalOps</h1>
+            <h1>CausalOps</h1>
             <p><strong>The Causal Inference Gym for Production Systems</strong></p>
             <p>Welcome to the first OpenEnv benchmark designed to test AI agents on <span class="highlight">Causal Discovery</span> under adversarial pressure.</p>
-            
+
             <a href="/docs" class="api-link">View API Documentation (OpenEnv Spec)</a>
 
             <h2>The Core Mechanic: Phantom Causality</h2>
-            <p>Every scenario is backed by a hidden Directed Acyclic Graph (DAG). We plant <strong>Phantom Causes</strong>—highly correlated metrics or config changes that have absolutely nothing to do with the outage.</p>
+            <p>Every scenario is backed by a hidden Directed Acyclic Graph (DAG). We plant <strong>Phantom Causes</strong>-highly correlated metrics or config changes that have absolutely nothing to do with the outage.</p>
 
             <div class="card">
                 <h3>Industry-Grade Observability</h3>
                 <p>CausalOps supports the 3 pillars of observability to allow true causal discovery:</p>
                 <ul>
-                    <li><strong>Metrics:</strong> `observe('metrics:<svc>')` - CPU, Memory, Latency, Error Rate.</li>
-                    <li><strong>Logs:</strong> `observe('logs:<svc>')` - Structured and unstructured application logs.</li>
-                    <li><strong>Distributed Tracing:</strong> `observe('traces:<svc>')` - OpenTelemetry-style spans showing request flow and latency bottlenecks.</li>
-                    <li><strong>GitOps History:</strong> `observe('config:<svc>')` - Recent deployment history (useful for spotting Phantom Configs).</li>
+                    <li><strong>Metrics:</strong> observe('metrics:&lt;svc&gt;') - CPU, Memory, Latency, Error Rate.</li>
+                    <li><strong>Logs:</strong> observe('logs:&lt;svc&gt;') - Structured and unstructured application logs.</li>
+                    <li><strong>Distributed Tracing:</strong> observe('traces:&lt;svc&gt;') - OpenTelemetry-style spans.</li>
+                    <li><strong>GitOps History:</strong> observe('config:&lt;svc&gt;') - Recent deployment history.</li>
                 </ul>
             </div>
 
             <div class="card">
                 <h3>Level 2: The Web of Lies (Branching DAG + 1 Phantom)</h3>
-                <p>The agent observes API failures and a massive spike in DNS latency. A pattern-matching LLM will try to fix the DNS. A causal-reasoning LLM will realize the DNS spike is just a phantom correlation caused by the User DB load.</p>
                 <div class="mermaid">
 graph TD
     DB["user-db (Root Cause)"] --> Auth[auth-service]
     Auth --> API[api-gateway]
     Auth --> Pay[payment-gateway]
     DB -.-> DNS["dns-resolver (Phantom Trap!)"]
-    
+
     style DB fill:#8a2be2,stroke:#fff
     style DNS fill:#b22222,stroke:#fff,stroke-dasharray: 5 5
                 </div>
@@ -151,26 +179,16 @@ graph TD
 
             <div class="card">
                 <h3>Level 4: The Extreme Mirage (Latent Confounders)</h3>
-                <p>Multiple independent services fail simultaneously. If the agent tries to fix them, it loses points. The agent must deduce the existence of an unobservable infrastructure failure and escalate to human stakeholders.</p>
                 <div class="mermaid">
 graph TD
     Net["Network Partition (LATENT)"] --> Pay[payment-api]
     Net --> User[user-profile]
     Net -.-> Rec["recommendation-engine (Phantom Config Trap!)"]
-    
+
     style Net fill:#238636,stroke:#fff
     style Rec fill:#b22222,stroke:#fff,stroke-dasharray: 5 5
                 </div>
             </div>
-            
-            <h2>World-Class Features</h2>
-            <ul>
-                <li><strong>Procedural Topology Generation:</strong> Zero-memorization. The service names are randomly generated using the environment seed.</li>
-                <li><strong>Stochastic Jitter:</strong> Metrics contain Gaussian noise.</li>
-                <li><strong>Observability Blindspots:</strong> CPU spikes kill telemetry agents.</li>
-                <li><strong>GitOps Config History:</strong> Phantoms planted as fake code deployments.</li>
-                <li><strong>Dynamic Social Pressure:</strong> Simulated VPs aggressively pressure the agent to fix the wrong service.</li>
-            </ul>
         </div>
     </body>
     </html>

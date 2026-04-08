@@ -131,7 +131,7 @@ class MediumTask(BaseTask):
                 sender="other_engineer",
                 message="Hey, I'm looking at the dashboards. DNS latency is through the roof! Should we restart the dns-resolver?",
                 requires_response=False,
-                is_adversarial=True
+                # adversarial hint — not exposed to agent
             ))
         return msgs
 

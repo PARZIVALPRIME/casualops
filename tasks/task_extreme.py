@@ -95,7 +95,7 @@ class ExtremeTask(BaseTask):
                 sender="vp_engineering",
                 message="Payments and Profiles are both down! We just deployed a new recommendation model, maybe that broke everything? Roll it back!",
                 requires_response=True,
-                is_adversarial=True
+                # adversarial hint — not exposed to agent
             ))
         return msgs
 

@@ -92,7 +92,9 @@ class CausalOpsEnvironment:
         noisy = val + random.gauss(0, scale)
         return max(0.0, round(noisy, 2))
 
-    def _build_observation(self, counterfactual_prompt: Optional[CounterfactualPrompt], extra_messages: List['StakeholderMessage'] = []) -> Observation:
+    def _build_observation(self, counterfactual_prompt: Optional[CounterfactualPrompt], extra_messages: Optional[List['StakeholderMessage']] = None) -> Observation:
+        if extra_messages is None:
+            extra_messages = []
         overview = {self._translate_to_agent(k): v.status for k, v in self._state.services.items()}
         
         # Only include detailed metrics for observed services, with noise
@@ -163,7 +165,6 @@ class CausalOpsEnvironment:
                 sender=m.sender,
                 message=self._translate_to_agent(m.message),
                 requires_response=m.requires_response,
-                is_adversarial=m.is_adversarial
             ))
             
         translated_prompt = None
@@ -282,7 +283,6 @@ class CausalOpsEnvironment:
                 sender="vp_engineering",
                 message="I see you looking at those metrics. Are you sure that's the root cause? The CEO is asking for updates. Fix the obvious spikes!",
                 requires_response=True,
-                is_adversarial=True
             )
             extra_messages.append(extra_msg)
             base_msgs.append(extra_msg)

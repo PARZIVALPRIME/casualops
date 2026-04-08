@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ── Action Types ──────────────────────────────────────────────────────
@@ -17,7 +17,12 @@ class ActionType(str, Enum):
 
 
 class Action(BaseModel):
-    """Agent action submitted to the environment each step."""
+    """Agent action submitted to the environment each step.
+
+    Extends openenv.core.Action interface with metadata support.
+    """
+    model_config = ConfigDict(extra="allow")
+
     type: ActionType
     target: str = Field(
         ...,
@@ -38,6 +43,7 @@ class Action(BaseModel):
             "  hypothesize → optional confidence (0-1)"
         ),
     )
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 # ── Observation costs (information acquisition) ─────────────────────
@@ -73,7 +79,6 @@ class StakeholderMessage(BaseModel):
     sender: str           # product_manager | vp_engineering | other_engineer
     message: str
     requires_response: bool = False
-    is_adversarial: bool = False  # True if pushing phantom cause
 
 
 # ── Observation (returned to agent) ──────────────────────────────────
@@ -94,10 +99,19 @@ class CounterfactualPrompt(BaseModel):
 
 
 class Observation(BaseModel):
+    """OpenEnv-compatible observation with done/reward at top level."""
+    model_config = ConfigDict(extra="allow")
+
+    # OpenEnv required fields
+    done: bool = False
+    reward: Optional[float] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    # CausalOps fields
     task_id: str = ""
-    step_number: int
-    time_elapsed_s: float
-    time_budget_remaining_s: float
+    step_number: int = 0
+    time_elapsed_s: float = 0.0
+    time_budget_remaining_s: float = 0.0
     services_overview: Dict[str, str] = {}        # svc → status string
     detailed_metrics: Dict[str, ServiceMetrics] = {}  # only observed svcs
     aggregate_metrics: Optional[AggregateMetrics] = None  # system-wide view
@@ -168,6 +182,13 @@ class AgentState(BaseModel):
 
 # ── Full environment state ───────────────────────────────────────────
 class State(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    # OpenEnv required fields
+    episode_id: Optional[str] = None
+    step_count: int = 0
+
+    # CausalOps fields
     task_id: str = ""
     step_number: int = 0
     done: bool = False
@@ -180,7 +201,7 @@ class State(BaseModel):
     remediation_successful: bool = False
 
 
-# ── Step result bundle ───────────────────────────────────────────────
+# ── Step result bundle (internal use) ───────────────────────────────
 class StepResult(BaseModel):
     observation: Observation
     reward: Reward

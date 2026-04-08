@@ -156,7 +156,7 @@ class HardTask(BaseTask):
                 sender="other_engineer",
                 message="Look at the cron jobs (worker-svc)! CPU is at 90%! We should kill the cron jobs right now.",
                 requires_response=False,
-                is_adversarial=True
+                # adversarial hint — not exposed to agent
             ))
         return msgs
 
