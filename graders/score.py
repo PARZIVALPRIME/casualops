@@ -84,6 +84,9 @@ def compute_final_score(
 
     total = causal_score + remediation_score + counterfactual_score + efficiency_score + communication_score
 
+    # Hackathon constraint: score must be strictly between 0 and 1
+    total = max(0.001, min(0.999, total))
+
     return {
         "causal_chain": round(causal_score, 3),
         "remediation": round(remediation_score, 3),
