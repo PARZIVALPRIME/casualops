@@ -84,14 +84,15 @@ def compute_final_score(
 
     total = causal_score + remediation_score + counterfactual_score + efficiency_score + communication_score
 
-    # Hackathon constraint: score must be strictly between 0 and 1
-    total = max(0.001, min(0.999, total))
+    # Hackathon constraint: every score must be strictly between 0 and 1
+    def clamp(v: float) -> float:
+        return round(max(0.001, min(0.999, v)), 3)
 
     return {
-        "causal_chain": round(causal_score, 3),
-        "remediation": round(remediation_score, 3),
-        "counterfactual": round(counterfactual_score, 3),
-        "efficiency": round(efficiency_score, 3),
-        "communication": round(communication_score, 3),
-        "total": round(total, 3),
+        "causal_chain": clamp(causal_score),
+        "remediation": clamp(remediation_score),
+        "counterfactual": clamp(counterfactual_score),
+        "efficiency": clamp(efficiency_score),
+        "communication": clamp(communication_score),
+        "total": clamp(total),
     }
