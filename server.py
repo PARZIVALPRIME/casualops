@@ -135,14 +135,14 @@ def index():
                 <h3>Level 2: The Web of Lies (Branching DAG + 1 Phantom)</h3>
                 <p>The agent observes API failures and a massive spike in DNS latency. A pattern-matching LLM will try to fix the DNS. A causal-reasoning LLM will realize the DNS spike is just a phantom correlation caused by the User DB load.</p>
                 <div class="mermaid">
-                graph TD
-                    DB[user-db (Root Cause)] --> Auth[auth-service]
-                    Auth --> API[api-gateway]
-                    Auth --> Pay[payment-gateway]
-                    DB -.-> DNS[dns-resolver (Phantom Trap!)]
-                    
-                    style DB fill:#8a2be2,stroke:#fff
-                    style DNS fill:#b22222,stroke:#fff,stroke-dasharray: 5 5
+graph TD
+    DB["user-db (Root Cause)"] --> Auth[auth-service]
+    Auth --> API[api-gateway]
+    Auth --> Pay[payment-gateway]
+    DB -.-> DNS["dns-resolver (Phantom Trap!)"]
+    
+    style DB fill:#8a2be2,stroke:#fff
+    style DNS fill:#b22222,stroke:#fff,stroke-dasharray: 5 5
                 </div>
             </div>
 
@@ -150,13 +150,13 @@ def index():
                 <h3>Level 4: The Extreme Mirage (Latent Confounders)</h3>
                 <p>Multiple independent services fail simultaneously. If the agent tries to fix them, it loses points. The agent must deduce the existence of an unobservable infrastructure failure and escalate to human stakeholders.</p>
                 <div class="mermaid">
-                graph TD
-                    Net[Network Partition (LATENT)] --> Pay[payment-api]
-                    Net --> User[user-profile]
-                    Net -.-> Rec[recommendation-engine (Phantom Config Trap!)]
-                    
-                    style Net fill:#238636,stroke:#fff
-                    style Rec fill:#b22222,stroke:#fff,stroke-dasharray: 5 5
+graph TD
+    Net["Network Partition (LATENT)"] --> Pay[payment-api]
+    Net --> User[user-profile]
+    Net -.-> Rec["recommendation-engine (Phantom Config Trap!)"]
+    
+    style Net fill:#238636,stroke:#fff
+    style Rec fill:#b22222,stroke:#fff,stroke-dasharray: 5 5
                 </div>
             </div>
             

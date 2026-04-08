@@ -1,3 +1,12 @@
+---
+title: CausalOps
+emoji: 🔮
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # 🔮 CausalOps: The Causal Inference Gym
 
 > **"Where right answers for wrong reasons score zero."**
