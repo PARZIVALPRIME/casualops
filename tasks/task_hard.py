@@ -76,11 +76,11 @@ class HardTask(BaseTask):
         worker = services["worker-svc"]
         cdn = services["cdn"]
 
-        # Phase 1: DB degrades
-        # Phase 2 (step >= 13): Cache thrashes + DB stabilizes
+        # PHASE 1: DB degrades
+        # PHASE 2 (step >= 13): Cache thrashes + DB stabilizes
         
-        fixed_db = "scale:inventory-db" in remediations
-        fixed_cache = "restart:cache-node" in remediations or "config:cache-node" in remediations
+        fixed_db = any("inventory-db" in r for r in remediations if "scale" in r)
+        fixed_cache = any("cache-node" in r for r in remediations if "restart" in r or "config" in r)
         
         if step < 13:
             # PHASE 1: DB degradation

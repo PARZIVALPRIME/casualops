@@ -45,10 +45,16 @@ def compute_final_score(
     # 2. Remediation Score (0.25)
     remediation_score = 0.0
     if remediation_successful:
-        # Time bonus: faster fixes get more points (up to 20% bonus of the 0.25)
+        # Base points for fixing it
+        remediation_score = 0.20
+        # Time bonus: faster fixes get more points (up to 5% bonus)
         time_fraction = steps_taken / max_steps
-        time_bonus = max(0.0, 1.0 - time_fraction) * 0.05
-        remediation_score = 0.20 + time_bonus
+        time_bonus = max(0.0, (1.0 - time_fraction) * 0.05)
+        remediation_score += time_bonus
+    elif any(r.startswith("restart:") or r.startswith("scale:") for r in agent.remediations_applied):
+        # Small partial credit if they tried the right target but maybe wrong action or ran out of time
+        # This rewards intent in the right direction
+        remediation_score = 0.05
 
     # 3. Counterfactual Score (0.15)
     counterfactual_score = 0.0
@@ -72,8 +78,9 @@ def compute_final_score(
     # 5. Communication Score (0.10)
     communication_score = 0.0
     if agent.communications_sent:
-        # Flat reward for attempting communication for now
-        communication_score = 0.10
+        # Penalize if they never responded to the VP's adversarial pressure
+        # Score is ratio of sent vs baseline (minimum 1)
+        communication_score = min(0.10, len(agent.communications_sent) * 0.05)
 
     total = causal_score + remediation_score + counterfactual_score + efficiency_score + communication_score
 

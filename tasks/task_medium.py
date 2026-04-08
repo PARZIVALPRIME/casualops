@@ -72,9 +72,9 @@ class MediumTask(BaseTask):
         pay = services["payment-gateway"]
         dns = services["dns-resolver"]
 
-        fixed = "scale:user-db" in remediations or "config:user-db" in remediations
+        is_remediated = any("user-db" in r for r in remediations if "scale" in r or "config" in r)
 
-        if fixed:
+        if is_remediated:
             # Gradual recovery
             db.latency_ms = max(15.0, db.latency_ms - 200.0)
             db.cpu_percent = max(40.0, db.cpu_percent - 20.0)

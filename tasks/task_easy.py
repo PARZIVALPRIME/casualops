@@ -51,9 +51,10 @@ class EasyTask(BaseTask):
         app = services["app-server"]
         db = services["database"]
 
-        fixed = "restart:database" in remediations or "scale:database" in remediations or "config:database" in remediations
+        # Unified remediation check: handle both name-mapped and raw targets
+        is_remediated = any("database" in r for r in remediations if "restart" in r or "scale" in r or "config" in r)
 
-        if fixed:
+        if is_remediated:
             # Gradual recovery
             db.latency_ms = max(10.0, db.latency_ms - 100.0)
             db.cpu_percent = max(30.0, db.cpu_percent - 10.0)

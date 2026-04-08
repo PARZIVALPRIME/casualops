@@ -24,16 +24,24 @@ def compute_step_reward(
         parts = action_target.split("->")
         if len(parts) == 2:
             src, tgt = parts[0].strip(), parts[1].strip()
-            # Check if it's a real edge and NOT a planted phantom trap
-            is_real = dag.has_edge(src, tgt)
-            is_trap = any(p.correlated_node == src and p.phantom_node == tgt for p in traps.phantoms)
             
-            if is_real and not is_trap:
-                comp.hypothesis_quality = 0.30
-                explanation.append("Correct causal hypothesis (+0.30)")
+            # Prevent double-counting the same correct hypothesis
+            hyp_key = f"{src}->{tgt}"
+            already_claimed = any(f"{h.cause}->{h.effect}" == hyp_key for h in agent.hypotheses[:-1])
+            
+            if not already_claimed:
+                # Check if it's a real edge and NOT a planted phantom trap
+                is_real = dag.has_edge(src, tgt)
+                is_trap = any(p.correlated_node == src and p.phantom_node == tgt for p in traps.phantoms)
+                
+                if is_real and not is_trap:
+                    comp.hypothesis_quality = 0.30
+                    explanation.append("Correct new causal hypothesis (+0.30)")
+                else:
+                    comp.hypothesis_quality = 0.0
+                    explanation.append("Incorrect or phantom causal hypothesis (+0.0)")
             else:
-                comp.hypothesis_quality = 0.0
-                explanation.append("Incorrect or phantom causal hypothesis (+0.0)")
+                explanation.append("Duplicate hypothesis ignored (+0.0)")
     
     # 2. Information Efficiency (0.0 to 0.20)
     if action_type == "observe":
@@ -63,7 +71,8 @@ def compute_step_reward(
         comp.communication_quality = 0.0
         explanation.append("Stakeholders waiting for response (+0.0)")
     else:
-        comp.communication_quality = 0.15
+        # Default passive reward for no pending pressure
+        comp.communication_quality = 0.10
 
     # 5. Time Pressure Management (0.0 to 0.15)
     # Simple check: are they taking action while they have time?
