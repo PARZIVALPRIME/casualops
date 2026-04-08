@@ -107,20 +107,29 @@ class EasyTask(BaseTask):
         return []
 
     def traces_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        """Industry Grade: Detailed OpenTelemetry-style traces."""
         if step < 3:
             return []
+        trace_id = f"tr-e1{step}"
         if svc == "load-balancer":
-            return ['{"trace_id": "a1b2", "span": "load-balancer", "duration_ms": 3050, "status": "ERROR"}']
+            return [
+                f'[{trace_id}] span_id=101 name="lb:proxy" kind=SERVER duration_ms=3050 status=502',
+                f'[{trace_id}] span_id=102 parent_id=101 name="app:call" kind=CLIENT duration_ms=3000 status=error'
+            ]
         if svc == "app-server":
-            return ['{"trace_id": "a1b2", "span": "app-server", "duration_ms": 3000, "downstream": "database", "status": "ERROR"}']
+            return [
+                f'[{trace_id}] span_id=201 name="app:handle" kind=SERVER duration_ms=3000 status=500',
+                f'[{trace_id}] span_id=202 parent_id=201 name="db:query" kind=CLIENT duration_ms=3000 status=timeout'
+            ]
         if svc == "database":
-            return ['{"trace_id": "a1b2", "span": "database", "duration_ms": 3000, "query": "SELECT *", "status": "TIMEOUT"}']
+            return [
+                f'[{trace_id}] span_id=301 name="db:execute" kind=SERVER duration_ms=3000 query="SELECT * FROM products" status=SLOW_QUERY'
+            ]
         return []
 
     def config_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
-        if svc == "database":
-            return ["No recent deployments."]
-        return ["No recent deployments."]
+        """Industry Grade: Clean deployment logs."""
+        return ["2026-03-20 14:00:00 - DEPLOY - env=prod - actor=system - commit=v1.2.0 - msg='Stable production build'"]
 
     def expected_fix_effects(self) -> Dict[str, str]:
         # "If this fix works, what metric should change first, by how much, and in what timeframe?"

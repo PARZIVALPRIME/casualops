@@ -117,8 +117,19 @@ def index():
             
             <a href="/docs" class="api-link">View API Documentation (OpenEnv Spec)</a>
 
-            <h2>The Problem: Confounding Bias</h2>
-            <p>Most LLMs suffer from confounding bias. When they see two metrics spike at the same time, they assume causation. CausalOps exploits this by planting <strong>Phantom Causes (Red Herrings)</strong> into the environment using Pearl's Causal Hierarchy.</p>
+            <h2>The Core Mechanic: Phantom Causality</h2>
+            <p>Every scenario is backed by a hidden Directed Acyclic Graph (DAG). We plant <strong>Phantom Causes</strong>—highly correlated metrics or config changes that have absolutely nothing to do with the outage.</p>
+
+            <div class="card">
+                <h3>Industry-Grade Observability</h3>
+                <p>CausalOps supports the 3 pillars of observability to allow true causal discovery:</p>
+                <ul>
+                    <li><strong>Metrics:</strong> `observe('metrics:<svc>')` - CPU, Memory, Latency, Error Rate.</li>
+                    <li><strong>Logs:</strong> `observe('logs:<svc>')` - Structured and unstructured application logs.</li>
+                    <li><strong>Distributed Tracing:</strong> `observe('traces:<svc>')` - OpenTelemetry-style spans showing request flow and latency bottlenecks.</li>
+                    <li><strong>GitOps History:</strong> `observe('config:<svc>')` - Recent deployment history (useful for spotting Phantom Configs).</li>
+                </ul>
+            </div>
 
             <div class="card">
                 <h3>Level 2: The Web of Lies (Branching DAG + 1 Phantom)</h3>

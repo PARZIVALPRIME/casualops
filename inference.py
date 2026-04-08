@@ -49,9 +49,9 @@ def main():
     parser.add_argument("--model", type=str, default="gpt-4o-mini")
     args = parser.parse_args()
 
-    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("HF_TOKEN", "dummy")
-    api_base = os.environ.get("API_BASE_URL", "https://api.openai.com/v1")
-    model_name = str(os.environ.get("MODEL_NAME", args.model))
+    api_key = os.environ.get("HF_TOKEN") or os.environ.get("OPENAI_API_KEY", "dummy")
+    api_base = os.environ.get("API_BASE_URL", "https://router.huggingface.co/v1")
+    model_name = os.environ.get("MODEL_NAME", args.model) or args.model
     
     try:
         client = OpenAI(api_key=api_key, base_url=api_base)  # type: ignore

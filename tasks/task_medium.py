@@ -158,24 +158,43 @@ class MediumTask(BaseTask):
         return []
 
     def traces_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        """Industry Grade: Detailed OpenTelemetry-style traces."""
         if step < 4:
             return []
+        trace_id = f"tr-9e{step}"
         if svc == "api-gateway":
-            return ['{"trace_id": "c9d8", "span": "api-gateway", "duration_ms": 1500, "downstream": "auth-service", "status": "ERROR"}']
+            return [
+                f'[{trace_id}] span_id=01 name="api:request" kind=SERVER duration_ms=1500 status=503',
+                f'[{trace_id}] span_id=02 parent_id=01 name="auth:call" kind=CLIENT duration_ms=1490 status=error'
+            ]
         if svc == "auth-service":
-            return ['{"trace_id": "c9d8", "span": "auth-service", "duration_ms": 1490, "downstream": "user-db", "status": "ERROR"}']
+            return [
+                f'[{trace_id}] span_id=03 parent_id=02 name="auth:process" kind=SERVER duration_ms=1490 status=500',
+                f'[{trace_id}] span_id=04 parent_id=03 name="db:query" kind=CLIENT duration_ms=1450 status=timeout'
+            ]
         if svc == "user-db":
-            return ['{"trace_id": "c9d8", "span": "user-db", "duration_ms": 1450, "query": "SELECT user_profiles", "status": "OOM_KILLED"}']
+            return [
+                f'[{trace_id}] span_id=05 parent_id=04 name="db:execute" kind=SERVER duration_ms=1450 query="SELECT * FROM users" status=ERROR_OOM'
+            ]
         if svc == "payment-gateway":
-            return ['{"trace_id": "x7y6", "span": "payment-gateway", "duration_ms": 2000, "downstream": "auth-service", "status": "ERROR"}']
+            p_trace = f"tr-p{step}"
+            return [
+                f'[{p_trace}] span_id=10 name="pay:init" kind=SERVER duration_ms=2000 status=503',
+                f'[{p_trace}] span_id=11 parent_id=10 name="auth:validate" kind=CLIENT duration_ms=1990 status=error'
+            ]
         return []
 
     def config_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        """Industry Grade: GitOps config history with 'Phantom Configs'."""
         if svc == "dns-resolver":
-            return ["Deployment 5 mins ago: Update corefile records (commit: 9a8b7c)"]
+            return [
+                f"2026-04-08 10:{step:02d}:05 - DEPLOY - env=prod - actor=gitops - commit=9a8b7c - msg='Update CoreDNS config (PHANTOM)'",
+                "2026-04-07 14:22:10 - DEPLOY - env=prod - actor=gitops - commit=1a2b3c - msg='Initial baseline'"
+            ]
         if svc == "user-db":
-            return ["No recent deployments."]
-        return ["No recent deployments."]
+            return ["2026-04-01 09:00:00 - DEPLOY - env=prod - actor=dba - commit=f0f0f0 - msg='Monthly maintenance'"]
+        
+        return ["No recent deployments in the last 24h."]
 
     def expected_fix_effects(self) -> Dict[str, str]:
         return {"latency_ms:user-db": "-500.0,20"}

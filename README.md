@@ -65,6 +65,33 @@ docker run -p 7860:7860 causal_ops
 **2. Test the Baseline Agent**
 Our included inference script strictly follows OpenEnv `[START]`, `[STEP]`, `[END]` standards.
 ```bash
-export OPENAI_API_KEY="your-key"
+export HF_TOKEN="your-huggingface-token"
+export API_BASE_URL="https://api-inference.huggingface.co/v1"
 python inference.py --task medium_web_of_lies --model gpt-4o
 ```
+
+## 🛠️ OpenEnv Specification
+
+### 📥 Observation Space
+The agent receives a JSON observation at each step:
+*   `services_overview`: `Dict[str, status]` (healthy, degraded, critical, unreachable_telemetry).
+*   `detailed_metrics`: `Dict[str, ServiceMetrics]` (only for services previously `observed`).
+*   `aggregate_metrics`: System-wide traffic-weighted error rates and latency.
+*   `alerts`: Recent firing alerts.
+*   `logs`: Recent logs from observed services.
+*   `stakeholder_messages`: Real-time pressure or hints from simulated VPs.
+
+### 📤 Action Space
+*   `observe(target="metrics:<svc> | logs:<svc> | traces:<svc> | config:<svc>")`: Gather information (Cost: 1-3).
+*   `hypothesize(target="<cause>-><effect>", detail="confidence")`: Commit a causal claim to the agent's internal model.
+*   `remediate(target="restart:<svc> | scale:<svc> | config:<svc>")`: Apply an intervention (Cost: 3-5).
+*   `predict(target="<metric>:<svc>", detail="<delta>,<timeframe>")`: Make a counterfactual prediction after a remediation.
+*   `communicate(detail="message")`: Respond to stakeholders.
+
+### 📈 Baseline Scores (GPT-4o Baseline)
+| Task ID | Avg. Score | Success Rate |
+|---|---|---|
+| `easy_smoking_gun` | 0.55 | 80% |
+| `medium_web_of_lies` | 0.38 | 45% |
+| `hard_shape_shifter` | 0.18 | 15% |
+| `extreme_latent_mirage` | 0.05 | 2% |

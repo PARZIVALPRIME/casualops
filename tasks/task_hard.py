@@ -179,27 +179,33 @@ class HardTask(BaseTask):
         return []
 
     def traces_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        """Industry Grade: Distributed traces for Regime Change scenarios."""
         if step < 5:
             return []
+        trace_id = f"tr-h3{step}"
         if svc == "frontend":
-            return ['{"trace_id": "f5e4", "span": "frontend", "duration_ms": 1200, "downstream": "search-api", "status": "WARN"}']
+            return [f'[{trace_id}] span_id=501 name="fe:render" kind=SERVER duration_ms=1200 status=200',
+                    f'[{trace_id}] span_id=502 parent_id=501 name="search:call" kind=CLIENT duration_ms=1150 status=warn']
         if svc == "search-api":
             if step < 13:
-                return ['{"trace_id": "f5e4", "span": "search-api", "duration_ms": 1150, "downstream": "inventory-db", "status": "WARN"}']
+                return [f'[{trace_id}] span_id=601 parent_id=502 name="search:exec" kind=SERVER duration_ms=1150 status=200',
+                        f'[{trace_id}] span_id=602 parent_id=601 name="db:lookup" kind=CLIENT duration_ms=1100 status=timeout']
             else:
-                return ['{"trace_id": "f5e4", "span": "search-api", "duration_ms": 2500, "downstream": "cache-node", "status": "ERROR"}']
+                return [f'[{trace_id}] span_id=701 parent_id=502 name="search:exec" kind=SERVER duration_ms=2500 status=500',
+                        f'[{trace_id}] span_id=702 parent_id=701 name="cache:get" kind=CLIENT duration_ms=2400 status=error']
         if svc == "inventory-db":
-            return ['{"trace_id": "f5e4", "span": "inventory-db", "duration_ms": 1100, "query": "UPDATE inventory", "status": "LOCK_TIMEOUT"}']
+            return [f'[{trace_id}] span_id=801 parent_id=602 name="db:query" kind=SERVER duration_ms=1100 query="UPDATE inv" status=LOCK_WAIT']
         if svc == "cache-node":
-            return ['{"trace_id": "f5e4", "span": "cache-node", "duration_ms": 2400, "command": "GET search_results", "status": "MISS"}']
+            return [f'[{trace_id}] span_id=901 parent_id=702 name="cache:op" kind=SERVER duration_ms=2400 status=EVICTION_LOOP']
         return []
 
     def config_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        """Industry Grade: Phantom Configs for CDN and Workers."""
         if svc == "cdn":
-            return ["Deployment 10 mins ago: Refresh static assets (commit: f1e2d3c)"]
+            return [f"2026-04-08 09:15:00 - DEPLOY - env=prod - actor=frontend-bot - commit=f1e2d - msg='Invalidate CDN cache (PHANTOM)'"]
         if svc == "worker-svc":
-            return ["Deployment 2 mins ago: Update cron schedules (commit: 5a4b3c)"]
-        return ["No recent deployments."]
+            return [f"2026-04-08 10:10:00 - DEPLOY - env=prod - actor=devops - commit=5a4b3 - msg='Scale worker replicas (PHANTOM)'"]
+        return ["No deployments in last 24h."]
 
     def expected_fix_effects(self) -> Dict[str, str]:
         return {"error_rate:cache-node": "-0.5,10"}

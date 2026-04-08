@@ -115,15 +115,25 @@ class ExtremeTask(BaseTask):
         return []
 
     def traces_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        """Industry Grade: Traces showing network-level failures."""
+        if step < 3:
+            return []
+        trace_id = f"tr-ex{step}"
+        if svc in ["payment-api", "user-profile"]:
+            return [
+                f'[{trace_id}] span_id=001 name="{svc}:request" kind=SERVER duration_ms=5000 status=error',
+                f'[{trace_id}] span_id=002 parent_id=001 name="network:egress" kind=INTERNAL status=TIMEOUT error="EHOSTUNREACH"'
+            ]
         return []
 
     def config_for_service(self, svc: str, step: int, services: Dict[str, ServiceMetrics]) -> List[str]:
+        """Industry Grade: The 'Web of Lies' config trap."""
         if svc == "recommendation-engine":
             return [
-                "Deployment 2 mins ago: Bump model weights to v4.2 (commit: 8f92a1c)",
-                "Deployment 3 days ago: Fix typo in logs (commit: 1a2b3c4)"
+                f"2026-04-08 10:08:00 - DEPLOY - env=prod - actor=ml-ops - commit=8f92a - msg='Update model weights v4.2 (PHANTOM TRAP)'",
+                "2026-04-05 09:00:00 - DEPLOY - env=prod - actor=ml-ops - commit=1a2b3 - msg='Baseline v4.1'"
             ]
-        return ["No recent deployments."]
+        return ["No deployments found in the specified region."]
 
     def expected_fix_effects(self) -> Dict[str, str]:
         # There is no fix effect because the agent cannot fix it.
