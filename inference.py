@@ -9,7 +9,7 @@ from typing import Optional
 from openai import OpenAI
 
 from env.environment import CausalOpsEnvironment
-from models import Action, ActionType
+from models import CausalOpsAction as Action, ActionType
 
 def parse_action(text: str) -> Action:
     """Naive parser for OpenAI output to extract the action."""

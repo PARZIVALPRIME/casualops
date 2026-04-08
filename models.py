@@ -1,49 +1,47 @@
-"""Pydantic models for CausalOps OpenEnv environment."""
+"""Pydantic models for CausalOps OpenEnv environment.
+
+Models inherit from openenv.core base classes for spec compliance.
+"""
 from __future__ import annotations
 
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from openenv.core.env_server import Action as OEAction, Observation as OEObservation, State as OEState
+from pydantic import Field
 
 
 # ── Action Types ──────────────────────────────────────────────────────
 class ActionType(str, Enum):
-    OBSERVE = "observe"            # Request metrics/logs for a service
-    HYPOTHESIZE = "hypothesize"    # Claim a causal edge (cause->effect)
-    REMEDIATE = "remediate"        # Apply a fix to a service
-    COMMUNICATE = "communicate"    # Respond to a stakeholder
-    PREDICT = "predict"            # Counterfactual prediction
+    OBSERVE = "observe"
+    HYPOTHESIZE = "hypothesize"
+    REMEDIATE = "remediate"
+    COMMUNICATE = "communicate"
+    PREDICT = "predict"
 
 
-class Action(BaseModel):
-    """Agent action submitted to the environment each step.
-
-    Extends openenv.core.Action interface with metadata support.
-    """
-    model_config = ConfigDict(extra="allow")
-
+class CausalOpsAction(OEAction):
+    """Agent action submitted to the environment each step."""
     type: ActionType
     target: str = Field(
         ...,
         description=(
-            "observe  → 'metrics:<svc>' | 'logs:<svc>' | 'traces:<svc>' | 'config:<svc>'\n"
-            "hypothesize → '<cause_node>-><effect_node>'\n"
-            "remediate → 'restart:<svc>' | 'scale:<svc>' | 'config:<svc>'\n"
-            "communicate → '<stakeholder_id>'\n"
-            "predict → '<metric>:<svc>'"
+            "observe  -> 'metrics:<svc>' | 'logs:<svc>' | 'traces:<svc>' | 'config:<svc>'\n"
+            "hypothesize -> '<cause_node>-><effect_node>'\n"
+            "remediate -> 'restart:<svc>' | 'scale:<svc>' | 'config:<svc>'\n"
+            "communicate -> '<stakeholder_id>'\n"
+            "predict -> '<metric>:<svc>'"
         ),
     )
     detail: str = Field(
         "",
         description=(
             "Extra payload.\n"
-            "  communicate → response text\n"
-            "  predict     → '<expected_delta>,<timeframe_s>'\n"
-            "  hypothesize → optional confidence (0-1)"
+            "  communicate -> response text\n"
+            "  predict     -> '<expected_delta>,<timeframe_s>'\n"
+            "  hypothesize -> optional confidence (0-1)"
         ),
     )
-    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 # ── Observation costs (information acquisition) ─────────────────────
@@ -64,57 +62,47 @@ REMEDIATE_COSTS: Dict[str, int] = {
 
 
 # ── Service-level metrics ────────────────────────────────────────────
-class ServiceMetrics(BaseModel):
+class ServiceMetrics(OEObservation):
     cpu_percent: float = 0.0
     memory_percent: float = 0.0
     latency_ms: float = 0.0
     error_rate: float = 0.0
     request_rate: float = 100.0
     disk_io_percent: float = 0.0
-    status: str = "healthy"  # healthy | degraded | critical
+    status: str = "healthy"
 
 
 # ── Stakeholder messages ─────────────────────────────────────────────
-class StakeholderMessage(BaseModel):
-    sender: str           # product_manager | vp_engineering | other_engineer
-    message: str
+class StakeholderMessage(OEObservation):
+    sender: str = ""
+    message: str = ""
     requires_response: bool = False
 
 
 # ── Observation (returned to agent) ──────────────────────────────────
-class AggregateMetrics(BaseModel):
-    """System-wide aggregate metrics (may be misleading — Simpson's Paradox)."""
+class AggregateMetrics(OEObservation):
     total_request_rate: float = 0.0
-    weighted_error_rate: float = 0.0     # traffic-weighted aggregate
+    weighted_error_rate: float = 0.0
     avg_latency_ms: float = 0.0
     services_healthy: int = 0
     services_degraded: int = 0
     services_critical: int = 0
 
 
-class CounterfactualPrompt(BaseModel):
-    """Injected after a remediate action — demands a falsifiable prediction."""
-    message: str
+class CounterfactualPrompt(OEObservation):
+    message: str = ""
     requires_prediction: bool = True
 
 
-class Observation(BaseModel):
-    """OpenEnv-compatible observation with done/reward at top level."""
-    model_config = ConfigDict(extra="allow")
-
-    # OpenEnv required fields
-    done: bool = False
-    reward: Optional[float] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-
-    # CausalOps fields
+class CausalOpsObservation(OEObservation):
+    """OpenEnv-compatible observation returned to the agent."""
     task_id: str = ""
     step_number: int = 0
     time_elapsed_s: float = 0.0
     time_budget_remaining_s: float = 0.0
-    services_overview: Dict[str, str] = {}        # svc → status string
-    detailed_metrics: Dict[str, ServiceMetrics] = {}  # only observed svcs
-    aggregate_metrics: Optional[AggregateMetrics] = None  # system-wide view
+    services_overview: Dict[str, str] = {}
+    detailed_metrics: Dict[str, ServiceMetrics] = {}
+    aggregate_metrics: Optional[AggregateMetrics] = None
     alerts: List[str] = []
     logs: List[str] = []
     stakeholder_messages: List[StakeholderMessage] = []
@@ -124,7 +112,7 @@ class Observation(BaseModel):
 
 
 # ── Reward (per-step, dense) ─────────────────────────────────────────
-class RewardComponents(BaseModel):
+class RewardComponents(OEObservation):
     hypothesis_quality: float = Field(default=0.0, ge=0.0, le=0.3)
     information_efficiency: float = Field(default=0.0, ge=0.0, le=0.2)
     phantom_resistance: float = Field(default=0.0, ge=0.0, le=0.2)
@@ -142,7 +130,7 @@ class RewardComponents(BaseModel):
         )
 
 
-class Reward(BaseModel):
+class Reward(OEObservation):
     components: RewardComponents = Field(default_factory=lambda: RewardComponents(
         hypothesis_quality=0.0,
         information_efficiency=0.0,
@@ -155,21 +143,21 @@ class Reward(BaseModel):
 
 
 # ── Agent-side accumulated state ─────────────────────────────────────
-class CausalClaim(BaseModel):
-    cause: str
-    effect: str
+class CausalClaim(OEObservation):
+    cause: str = ""
+    effect: str = ""
     confidence: float = Field(1.0, ge=0.0, le=1.0)
 
 
-class CounterfactualPrediction(BaseModel):
-    metric_name: str
-    service: str
-    expected_delta: float
-    timeframe_s: float
+class CounterfactualPrediction(OEObservation):
+    metric_name: str = ""
+    service: str = ""
+    expected_delta: float = 0.0
+    timeframe_s: float = 0.0
     step_made: int = 0
 
 
-class AgentState(BaseModel):
+class AgentState(OEObservation):
     hypotheses: List[CausalClaim] = []
     predictions: List[CounterfactualPrediction] = []
     observations_made: List[str] = []
@@ -181,14 +169,8 @@ class AgentState(BaseModel):
 
 
 # ── Full environment state ───────────────────────────────────────────
-class State(BaseModel):
-    model_config = ConfigDict(extra="allow")
-
-    # OpenEnv required fields
-    episode_id: Optional[str] = None
-    step_count: int = 0
-
-    # CausalOps fields
+class CausalOpsState(OEState):
+    """OpenEnv-compatible state."""
     task_id: str = ""
     step_number: int = 0
     done: bool = False
@@ -199,11 +181,3 @@ class State(BaseModel):
     current_phase: int = 1
     total_reward: float = 0.0
     remediation_successful: bool = False
-
-
-# ── Step result bundle (internal use) ───────────────────────────────
-class StepResult(BaseModel):
-    observation: Observation
-    reward: Reward
-    done: bool
-    info: Dict[str, object] = {}
