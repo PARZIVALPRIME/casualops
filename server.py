@@ -49,8 +49,10 @@ class ResetRequest(BaseModel):
 
 # ── Endpoints ────────────────────────────────────────────────────
 @app.post("/reset", response_model=Observation)
-def reset(req: ResetRequest) -> Observation:
+def reset(req: ResetRequest | None = None) -> Observation:
     """Initialize a new episode for the given task."""
+    if req is None:
+        req = ResetRequest()
     try:
         obs = _env.reset(req.task_id, seed=req.seed)
         return obs
