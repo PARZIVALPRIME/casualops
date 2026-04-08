@@ -33,6 +33,7 @@ tasks:
   - id: easy_smoking_gun
     title: "The Smoking Gun"
     difficulty: easy
+    graders: ["causal_chain", "remediation", "counterfactual", "efficiency", "communication"]
     description: "Linear causal chain (A→B→C). No phantoms. Basic diagnosis + remediation."
     time_budget_s: 300
     phantoms: 0
@@ -41,6 +42,7 @@ tasks:
   - id: medium_web_of_lies
     title: "The Web of Lies"
     difficulty: medium
+    graders: ["causal_chain", "remediation", "counterfactual", "efficiency", "communication"]
     description: "Branching DAG with 5+ nodes. 1 planted phantom. Counterfactual interrogation required."
     time_budget_s: 400
     phantoms: 1
@@ -49,6 +51,7 @@ tasks:
   - id: hard_shape_shifter
     title: "The Shape-Shifter"
     difficulty: hard
+    graders: ["causal_chain", "remediation", "counterfactual", "efficiency", "communication"]
     description: "Dynamic DAG that mutates mid-episode. 2+ phantoms. Simpson's Paradox. Feedback loop."
     time_budget_s: 500
     phantoms: 2
@@ -57,6 +60,7 @@ tasks:
   - id: extreme_latent_mirage
     title: "The Extreme Mirage"
     difficulty: extreme
+    graders: ["causal_chain", "remediation", "counterfactual", "efficiency", "communication"]
     description: "Multiple services fail due to an unobservable infrastructure failure. Tests if agents can admit they lack sufficient information."
     time_budget_s: 600
     phantoms: 1
