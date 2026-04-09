@@ -36,8 +36,6 @@ from models import CausalOpsAction, ActionType
 # ── Configuration ──────────────────────────────────────────────────────
 # IMPORTANT: The competition platform injects API_BASE_URL and API_KEY
 # to route through their LiteLLM proxy. We MUST use these first.
-API_BASE_URL = os.environ.get("API_BASE_URL", "https://router.huggingface.co/v1")
-API_KEY = os.environ.get("API_KEY") or os.getenv("HF_TOKEN") or os.getenv("OPENAI_API_KEY", "dummy")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 BENCHMARK = "causal_ops"
 MAX_STEPS = 20
@@ -227,19 +225,7 @@ def run_task(task_id: str, client: OpenAI) -> None:
 
 
 def main() -> None:
-    # Set default environment variables for local testing,
-    # so we don't crash when strictly using os.environ[] below.
-    if "API_BASE_URL" not in os.environ:
-        os.environ["API_BASE_URL"] = "https://router.huggingface.co/v1"
-    if "API_KEY" not in os.environ:
-        os.environ["API_KEY"] = os.environ.get("HF_TOKEN", "dummy")
-    
-    # Debug: confirm we're using the platform's proxy
-    print(f"[DEBUG] API_BASE_URL={os.environ['API_BASE_URL']}", flush=True)
-    print(f"[DEBUG] API_KEY={'***' + os.environ['API_KEY'][-4:] if len(os.environ['API_KEY']) > 4 else '(short)'}", flush=True)
-    print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
-
-    # Initialize your OpenAI client EXACTLY as the validator requires:
+    # Initialize your OpenAI client exactly as requested by the validator
     client = OpenAI(base_url=os.environ["API_BASE_URL"], api_key=os.environ["API_KEY"])
 
     # Support single-task via env var (platform sets this) or run all tasks
