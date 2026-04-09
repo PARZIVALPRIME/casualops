@@ -170,16 +170,13 @@ def run_task(task_id: str, client: OpenAI) -> None:
                 # Get LLM action
                 ai_text = '{"type": "observe", "target": "metrics:database", "detail": ""}'
                 error_msg = None
-                try:
-                    response = client.chat.completions.create(
-                        model=MODEL_NAME,
-                        messages=messages,  # type: ignore
-                        temperature=TEMPERATURE,
-                        max_tokens=MAX_TOKENS,
-                    )
-                    ai_text = response.choices[0].message.content or ai_text
-                except Exception as e:
-                    error_msg = str(e)
+                response = client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=messages,  # type: ignore
+                    temperature=TEMPERATURE,
+                    max_tokens=MAX_TOKENS,
+                )
+                ai_text = response.choices[0].message.content or ai_text
 
                 messages.append({"role": "assistant", "content": ai_text})
 
@@ -187,38 +184,25 @@ def run_task(task_id: str, client: OpenAI) -> None:
                 action = parse_action(ai_text)
                 action_str = f"{action.type.value}('{action.target}')"
 
-                try:
-                    # env.step() returns StepResult
-                    result = env.step(action)
-                    obs = result.observation
-                    reward = result.reward if result.reward is not None else 0.01
-                    reward = float(reward)
-                    done = result.done
-                    steps_taken = step
-                    rewards.append(reward)
+                # env.step() returns StepResult
+                result = env.step(action)
+                obs = result.observation
+                reward = result.reward if result.reward is not None else 0.01
+                reward = float(reward)
+                done = result.done
+                steps_taken = step
+                rewards.append(reward)
 
-                    log_step(step=step, action=action_str, reward=reward, done=done, error=error_msg)
-                    
-                    if done:
-                        state_res = env.state()
-                        success = state_res.state.get("remediation_successful", False) if state_res.state else False
-
-                except Exception as e:
-                    rewards.append(0.01)
-                    steps_taken = step
-                    log_step(step=step, action=action_str, reward=0.01, done=True, error=str(e))
-                    done = True
-                    break
+                log_step(step=step, action=action_str, reward=reward, done=done, error=error_msg)
+                
+                if done:
+                    state_res = env.state()
+                    success = state_res.state.get("remediation_successful", False) if state_res.state else False
 
             # Compute final score from the last reward (which is the final grader score when done)
             if rewards:
                 score = rewards[-1] if done else clamp_score(sum(rewards) / len(rewards))
             score = clamp_score(score)
-
-    except Exception as e:
-        # Even on total failure, emit a valid [END] with score in (0, 1)
-        score = 0.01
-        print(f"[DEBUG] Task {task_id} error: {e}", flush=True)
 
     finally:
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
