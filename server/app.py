@@ -14,6 +14,18 @@ _shared_env = CausalOpsEnvironment()
 
 app = create_app(lambda: _shared_env, CausalOpsAction, CausalOpsObservation, env_name="causal_ops")
 
+
+@app.get("/")
+def root():
+    """Root endpoint for HF Spaces health/landing page."""
+    return {
+        "name": "CausalOps",
+        "status": "running",
+        "env": "causal_ops",
+        "endpoints": ["/reset", "/step", "/state", "/health"],
+    }
+
+
 def main():
     """Entry point for the server script."""
     import uvicorn
