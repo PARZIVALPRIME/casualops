@@ -7,7 +7,7 @@ from openenv.core import EnvClient
 from models import CausalOpsAction, CausalOpsObservation, CausalOpsState
 
 # Default Space URL — override via CAUSAL_OPS_URL env var
-DEFAULT_URL = "http://localhost:7860"
+DEFAULT_URL = "https://casualops.hf.space"
 
 ENV_URL = os.getenv("CAUSAL_OPS_URL", DEFAULT_URL)
 
