@@ -227,12 +227,22 @@ def run_task(task_id: str, client: OpenAI) -> None:
 
 
 def main() -> None:
+    # IMPORTANT: The competition platform injects API_BASE_URL and API_KEY
+    # We must use exactly these, or the grader will fail us for bypassing the proxy.
+    api_base_url = os.environ.get("API_BASE_URL", "https://router.huggingface.co/v1")
+    api_key = os.environ.get("API_KEY", os.environ.get("HF_TOKEN", "dummy"))
+    
     # Debug: confirm we're using the platform's proxy
-    print(f"[DEBUG] API_BASE_URL={API_BASE_URL}", flush=True)
-    print(f"[DEBUG] API_KEY={'***' + API_KEY[-4:] if len(API_KEY) > 4 else '(short)'}", flush=True)
+    print(f"[DEBUG] API_BASE_URL={api_base_url}", flush=True)
+    print(f"[DEBUG] API_KEY={'***' + api_key[-4:] if len(api_key) > 4 else '(short)'}", flush=True)
     print(f"[DEBUG] MODEL_NAME={MODEL_NAME}", flush=True)
 
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    # Initialize the OpenAI client EXACTLY as requested by the grader rules:
+    # "Initialize your OpenAI client with base_url=os.environ["API_BASE_URL"] and api_key=os.environ["API_KEY"]."
+    if "API_BASE_URL" in os.environ and "API_KEY" in os.environ:
+        client = OpenAI(base_url=os.environ["API_BASE_URL"], api_key=os.environ["API_KEY"])
+    else:
+        client = OpenAI(base_url=api_base_url, api_key=api_key)
 
     # Support single-task via env var (platform sets this) or run all tasks
     single_task = os.getenv("CAUSAL_OPS_TASK")
