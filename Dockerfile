@@ -1,5 +1,5 @@
 # Dockerfile for CausalOps OpenEnv deployment
-# Compatible with Hugging Face Spaces (Docker SDK) and OpenEnv from_docker_image
+# Compatible with Hugging Face Spaces (Docker SDK)
 # Constraints: 2 vCPU, 8GB RAM, <20 min runtime
 
 FROM python:3.11-slim
@@ -8,9 +8,6 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# PORT: 7860 for HF Spaces, overridable for OpenEnv (which expects 8000)
-ENV PORT=7860
-
 WORKDIR /app
 
 # Install dependencies
@@ -18,12 +15,13 @@ COPY . .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir .
 
-# Expose both ports (HF Spaces=7860, OpenEnv default=8000)
-EXPOSE 7860 8000
+# HF Spaces expects port 7860 by default
+EXPOSE 7860
 
-# Health check (uses PORT env var)
-HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=5 \
-    CMD python -c "import os,urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PORT\",\"7860\")}/health')" || exit 1
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/health')" || exit 1
 
-# Run FastAPI via uvicorn — use $PORT so both HF Spaces and OpenEnv work
-CMD uvicorn server.app:app --host 0.0.0.0 --port ${PORT} --workers 1
+# Run FastAPI via uvicorn
+# --workers 1 keeps memory low (single-process, stateful env)
+CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]

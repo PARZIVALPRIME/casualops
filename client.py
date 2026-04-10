@@ -15,8 +15,10 @@ ENV_URL = os.getenv("CAUSAL_OPS_URL", DEFAULT_URL)
 class CausalOpsClient(EnvClient[CausalOpsAction, CausalOpsObservation, CausalOpsState]):
     """Thin wrapper around EnvClient pre-configured for CausalOps."""
 
-    def __init__(self, base_url: str = ENV_URL, **kwargs):
-        super().__init__(base_url=base_url, **kwargs)
+    def __init__(self, base_url: str = ENV_URL):
+        super().__init__(
+            base_url=base_url,
+        )
 
     def _step_payload(self, action: CausalOpsAction) -> Dict[str, Any]:
         return {

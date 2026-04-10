@@ -13,18 +13,29 @@ STDOUT FORMAT
     [START] task=<task_name> env=<benchmark> model=<model_name>
     [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
     [END]   success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...,rn>
+
+IMPORTANT
+- This script uses HTTP requests to talk to the env server (no local imports
+  of env/models/graders). This ensures it works when run by the platform's
+  evaluation runner, which may not have our local packages installed.
+- All LLM calls go through os.environ["API_BASE_URL"] / os.environ["API_KEY"].
 """
-import asyncio
 import json
 import os
 import textwrap
 from typing import Any, Dict, List, Optional
 
+import requests
 from openai import OpenAI
-from client import CausalOpsClient
-from models import CausalOpsAction, ActionType
 
 # ── Configuration ──────────────────────────────────────────────────────
+# Platform-injected LLM proxy credentials (mandatory)
+API_BASE_URL = os.environ["API_BASE_URL"]
+API_KEY = os.environ["API_KEY"]
+
+# Our HF Space URL where the env server is running
+ENV_URL = os.getenv("ENV_URL", "https://prey7-causal-ops.hf.space")
+
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 BENCHMARK = "causal_ops"
 MAX_STEPS = 20
@@ -60,24 +71,43 @@ SYSTEM_PROMPT = textwrap.dedent("""\
 """).strip()
 
 
+# ── Env HTTP helpers (talk to HF Space, no local imports needed) ──────
+def env_reset(task_id: str) -> Dict[str, Any]:
+    """POST /reset on the env server, return {observation, reward, done}."""
+    r = requests.post(f"{ENV_URL}/reset", json={"task_id": task_id}, timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+
+def env_step(action: Dict[str, str]) -> Dict[str, Any]:
+    """POST /step on the env server, return {observation, reward, done}."""
+    r = requests.post(f"{ENV_URL}/step", json={"action": action}, timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+
+# ── Score / action helpers ────────────────────────────────────────────
 def clamp_score(v: float) -> float:
+    """Clamp score to strictly (0, 1) exclusive range."""
     return round(max(0.01, min(0.99, v)), 2)
 
 
-def parse_action(text: str) -> CausalOpsAction:
+def parse_action(text: str) -> Dict[str, str]:
+    """Parse LLM output into an action dict. Falls back to a safe default."""
+    default = {"type": "observe", "target": "metrics:load-balancer", "detail": ""}
     try:
         start = text.find("{")
         end = text.rfind("}") + 1
         if start != -1 and end > start:
             data = json.loads(text[start:end])
-            return CausalOpsAction(
-                type=ActionType(data.get("type", "observe")),
-                target=data.get("target", "metrics:load-balancer"),
-                detail=str(data.get("detail", "")),
-            )
+            return {
+                "type": data.get("type", "observe"),
+                "target": data.get("target", "metrics:load-balancer"),
+                "detail": str(data.get("detail", "")),
+            }
     except Exception:
         pass
-    return CausalOpsAction(type=ActionType.OBSERVE, target="metrics:load-balancer", detail="")
+    return default
 
 
 # ── Logging helpers ────────────────────────────────────────────────────
@@ -86,9 +116,10 @@ def log_start(task: str, env: str, model: str) -> None:
 
 
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
+    error_val = error if error else "null"
+    done_val = str(done).lower()
     print(
-        f"[STEP] step={step} action={action} reward={reward:.2f} "
-        f"done={str(done).lower()} error={error or 'null'}",
+        f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}",
         flush=True,
     )
 
@@ -101,9 +132,9 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
     )
 
 
-# ── Async episode runner ──────────────────────────────────────────────
-async def run_task(task_id: str, llm: OpenAI, env: CausalOpsClient) -> None:
-    """Run a single task episode using async env client."""
+# ── Main episode runner ───────────────────────────────────────────────
+def run_task(task_id: str, client: OpenAI) -> None:
+    """Run a single task episode and emit [START]/[STEP]/[END] logs."""
     log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
 
     rewards: List[float] = []
@@ -112,45 +143,42 @@ async def run_task(task_id: str, llm: OpenAI, env: CausalOpsClient) -> None:
     success = False
 
     try:
-        result = await env.reset(task_id=task_id)
-        obs = result.observation
-        done = result.done
+        # Reset env via HTTP
+        reset_data = env_reset(task_id)
+        obs = reset_data.get("observation", {})
+        done = reset_data.get("done", False)
 
-        messages: list = [{"role": "system", "content": SYSTEM_PROMPT}]
+        messages: list = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+        ]
 
         for step in range(1, MAX_STEPS + 1):
             if done:
                 break
 
-            obs_dict: Dict[str, Any] = {
-                "step": obs.step_number,
-                "time_remaining_s": round(obs.time_budget_remaining_s, 1),
-                "services": obs.services_overview,
-                "alerts": obs.alerts[:5],
-                "logs": obs.logs[:10],
-                "stakeholder_messages": [
-                    {"sender": m.sender, "message": m.message, "requires_response": m.requires_response}
-                    for m in obs.stakeholder_messages
-                ],
-                "available_actions": obs.available_actions,
-                "task_description": obs.task_description,
+            # Build compact observation summary for the LLM
+            obs_summary: Dict[str, Any] = {
+                "step": obs.get("step_number", step),
+                "time_remaining_s": obs.get("time_budget_remaining_s", 0),
+                "services": obs.get("services_overview", {}),
+                "alerts": obs.get("alerts", [])[:5],
+                "logs": obs.get("logs", [])[:10],
+                "stakeholder_messages": obs.get("stakeholder_messages", [])[:5],
+                "available_actions": obs.get("available_actions", []),
+                "task_description": obs.get("task_description", ""),
             }
-            if obs.detailed_metrics:
-                obs_dict["detailed_metrics"] = {
-                    k: {"cpu": v.cpu_percent, "latency_ms": v.latency_ms,
-                         "error_rate": v.error_rate, "status": v.status}
-                    for k, v in obs.detailed_metrics.items()
-                }
-            if obs.counterfactual_prompt:
-                obs_dict["counterfactual_prompt"] = obs.counterfactual_prompt.message
+            if obs.get("detailed_metrics"):
+                obs_summary["detailed_metrics"] = obs["detailed_metrics"]
+            if obs.get("counterfactual_prompt"):
+                obs_summary["counterfactual_prompt"] = obs["counterfactual_prompt"]
 
-            messages.append({"role": "user", "content": json.dumps(obs_dict, default=str)})
+            messages.append({"role": "user", "content": json.dumps(obs_summary, default=str)})
 
             # ── LLM call through the platform proxy ──
             ai_text = '{"type": "observe", "target": "metrics:database", "detail": ""}'
             error_msg = None
             try:
-                response = llm.chat.completions.create(
+                response = client.chat.completions.create(
                     model=MODEL_NAME,
                     messages=messages,
                     temperature=TEMPERATURE,
@@ -162,16 +190,19 @@ async def run_task(task_id: str, llm: OpenAI, env: CausalOpsClient) -> None:
 
             messages.append({"role": "assistant", "content": ai_text})
 
+            # Parse action and step the env via HTTP
             action = parse_action(ai_text)
-            action_str = f"{action.type.value}('{action.target}')"
+            action_str = f"{action['type']}('{action['target']}')"
 
             try:
-                result = await env.step(action)
-                obs = result.observation
-                reward = float(result.reward) if result.reward is not None else 0.01
-                done = result.done
+                step_data = env_step(action)
+                obs = step_data.get("observation", {})
+                reward = step_data.get("reward")
+                reward = float(reward) if reward is not None else 0.01
+                done = step_data.get("done", False)
                 steps_taken = step
                 rewards.append(reward)
+
                 log_step(step=step, action=action_str, reward=reward, done=done, error=error_msg)
             except Exception as e:
                 rewards.append(0.01)
@@ -180,6 +211,7 @@ async def run_task(task_id: str, llm: OpenAI, env: CausalOpsClient) -> None:
                 done = True
                 break
 
+        # Final score
         if rewards:
             score = rewards[-1] if done else clamp_score(sum(rewards) / len(rewards))
         score = clamp_score(score)
@@ -192,28 +224,22 @@ async def run_task(task_id: str, llm: OpenAI, env: CausalOpsClient) -> None:
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
 
-async def main() -> None:
-    # LLM client — must use platform-injected proxy
-    llm = OpenAI(
-        base_url=os.environ["API_BASE_URL"],
-        api_key=os.environ["API_KEY"],
+def main() -> None:
+    # Initialize OpenAI client with platform-injected proxy credentials
+    client = OpenAI(
+        base_url=API_BASE_URL,
+        api_key=API_KEY,
     )
 
-    tasks = [os.environ["CAUSAL_OPS_TASK"]] if os.getenv("CAUSAL_OPS_TASK") else ALL_TASKS
+    single_task = os.getenv("CAUSAL_OPS_TASK")
+    if single_task:
+        tasks = [single_task]
+    else:
+        tasks = ALL_TASKS
 
-    # Start env from Docker image, passing PORT=8000 so the container
-    # binds to port 8000 (OpenEnv's LocalDockerProvider default mapping)
-    env = await CausalOpsClient.from_docker_image(
-        "casualops:latest",
-        env_vars={"PORT": "8000"},
-    )
-
-    try:
-        for task_id in tasks:
-            await run_task(task_id, llm, env)
-    finally:
-        await env.close()
+    for task_id in tasks:
+        run_task(task_id, client)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
