@@ -4,8 +4,8 @@ Inference Script for CausalOps OpenEnv Environment
 MANDATORY
 - Before submitting, ensure the following variables are defined in your environment configuration:
     API_BASE_URL   The API endpoint for the LLM.
+    API_KEY        Your API key for the LLM proxy.
     MODEL_NAME     The model identifier to use for inference.
-    HF_TOKEN       Your Hugging Face / API key.
 
 STDOUT FORMAT
 - The script must emit exactly three line types to stdout, in this order:
@@ -14,26 +14,28 @@ STDOUT FORMAT
     [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
     [END]   success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...,rn>
 
-  Rules:
-    - One [START] line at episode begin.
-    - One [STEP] line per step, immediately after env.step() returns.
-    - One [END] line after episode ends, always emitted (even on exception).
-    - reward and rewards are formatted to 2 decimal places.
-    - done and success are lowercase booleans: true or false.
-    - error is the raw error string, or null if none.
-    - Each tasks should return score in (0, 1) exclusive.
+IMPORTANT
+- This script uses HTTP requests to talk to the env server (no local imports
+  of env/models/graders). This ensures it works when run by the platform's
+  evaluation runner, which may not have our local packages installed.
+- All LLM calls go through os.environ["API_BASE_URL"] / os.environ["API_KEY"].
 """
 import json
 import os
 import textwrap
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
+import requests
 from openai import OpenAI
 
-from env.environment import CausalOpsEnvironment
-from models import CausalOpsAction, ActionType
-
 # ── Configuration ──────────────────────────────────────────────────────
+# Platform-injected LLM proxy credentials (mandatory)
+API_BASE_URL = os.environ["API_BASE_URL"]
+API_KEY = os.environ["API_KEY"]
+
+# Our HF Space URL where the env server is running
+ENV_URL = os.getenv("ENV_URL", "https://prey7-causal-ops.hf.space")
+
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 BENCHMARK = "causal_ops"
 MAX_STEPS = 20
@@ -69,26 +71,43 @@ SYSTEM_PROMPT = textwrap.dedent("""\
 """).strip()
 
 
+# ── Env HTTP helpers (talk to HF Space, no local imports needed) ──────
+def env_reset(task_id: str) -> Dict[str, Any]:
+    """POST /reset on the env server, return {observation, reward, done}."""
+    r = requests.post(f"{ENV_URL}/reset", json={"task_id": task_id}, timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+
+def env_step(action: Dict[str, str]) -> Dict[str, Any]:
+    """POST /step on the env server, return {observation, reward, done}."""
+    r = requests.post(f"{ENV_URL}/step", json={"action": action}, timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+
+# ── Score / action helpers ────────────────────────────────────────────
 def clamp_score(v: float) -> float:
     """Clamp score to strictly (0, 1) exclusive range."""
     return round(max(0.01, min(0.99, v)), 2)
 
 
-def parse_action(text: str) -> CausalOpsAction:
-    """Parse LLM output into an action. Falls back to a safe default."""
+def parse_action(text: str) -> Dict[str, str]:
+    """Parse LLM output into an action dict. Falls back to a safe default."""
+    default = {"type": "observe", "target": "metrics:load-balancer", "detail": ""}
     try:
         start = text.find("{")
         end = text.rfind("}") + 1
         if start != -1 and end > start:
             data = json.loads(text[start:end])
-            return CausalOpsAction(
-                type=ActionType(data.get("type", "observe")),
-                target=data.get("target", "metrics:load-balancer"),
-                detail=str(data.get("detail", "")),
-            )
+            return {
+                "type": data.get("type", "observe"),
+                "target": data.get("target", "metrics:load-balancer"),
+                "detail": str(data.get("detail", "")),
+            }
     except Exception:
         pass
-    return CausalOpsAction(type=ActionType.OBSERVE, target="metrics:load-balancer", detail="")
+    return default
 
 
 # ── Logging helpers ────────────────────────────────────────────────────
@@ -113,10 +132,9 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
     )
 
 
+# ── Main episode runner ───────────────────────────────────────────────
 def run_task(task_id: str, client: OpenAI) -> None:
     """Run a single task episode and emit [START]/[STEP]/[END] logs."""
-    env = CausalOpsEnvironment()
-
     log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
 
     rewards: List[float] = []
@@ -125,49 +143,44 @@ def run_task(task_id: str, client: OpenAI) -> None:
     success = False
 
     try:
-        obs = env.reset(task_id=task_id)
+        # Reset env via HTTP
+        reset_data = env_reset(task_id)
+        obs = reset_data.get("observation", {})
+        done = reset_data.get("done", False)
 
-        messages = [
+        messages: list = [
             {"role": "system", "content": SYSTEM_PROMPT},
         ]
-
-        done = obs.done
 
         for step in range(1, MAX_STEPS + 1):
             if done:
                 break
 
-            obs_summary = {
-                "step": obs.step_number,
-                "time_remaining_s": round(obs.time_budget_remaining_s, 1),
-                "services": obs.services_overview,
-                "alerts": obs.alerts[:5],
-                "logs": obs.logs[:10],
-                "stakeholder_messages": [
-                    {"sender": m.sender, "message": m.message, "requires_response": m.requires_response}
-                    for m in obs.stakeholder_messages
-                ],
-                "available_actions": obs.available_actions,
-                "task_description": obs.task_description,
+            # Build compact observation summary for the LLM
+            obs_summary: Dict[str, Any] = {
+                "step": obs.get("step_number", step),
+                "time_remaining_s": obs.get("time_budget_remaining_s", 0),
+                "services": obs.get("services_overview", {}),
+                "alerts": obs.get("alerts", [])[:5],
+                "logs": obs.get("logs", [])[:10],
+                "stakeholder_messages": obs.get("stakeholder_messages", [])[:5],
+                "available_actions": obs.get("available_actions", []),
+                "task_description": obs.get("task_description", ""),
             }
-            if obs.detailed_metrics:
-                obs_summary["detailed_metrics"] = {
-                    k: {"cpu": v.cpu_percent, "latency_ms": v.latency_ms,
-                         "error_rate": v.error_rate, "status": v.status}
-                    for k, v in obs.detailed_metrics.items()
-                }
-            if obs.counterfactual_prompt:
-                obs_summary["counterfactual_prompt"] = obs.counterfactual_prompt.message
+            if obs.get("detailed_metrics"):
+                obs_summary["detailed_metrics"] = obs["detailed_metrics"]
+            if obs.get("counterfactual_prompt"):
+                obs_summary["counterfactual_prompt"] = obs["counterfactual_prompt"]
 
             messages.append({"role": "user", "content": json.dumps(obs_summary, default=str)})
 
-            # Call the LLM through the platform proxy
+            # ── LLM call through the platform proxy ──
             ai_text = '{"type": "observe", "target": "metrics:database", "detail": ""}'
             error_msg = None
             try:
                 response = client.chat.completions.create(
                     model=MODEL_NAME,
-                    messages=messages,  # type: ignore
+                    messages=messages,
                     temperature=TEMPERATURE,
                     max_tokens=MAX_TOKENS,
                 )
@@ -177,14 +190,16 @@ def run_task(task_id: str, client: OpenAI) -> None:
 
             messages.append({"role": "assistant", "content": ai_text})
 
+            # Parse action and step the env via HTTP
             action = parse_action(ai_text)
-            action_str = f"{action.type.value}('{action.target}')"
+            action_str = f"{action['type']}('{action['target']}')"
 
             try:
-                # env.step() returns CausalOpsObservation directly
-                obs = env.step(action)
-                reward = float(obs.reward) if obs.reward is not None else 0.01
-                done = obs.done
+                step_data = env_step(action)
+                obs = step_data.get("observation", {})
+                reward = step_data.get("reward")
+                reward = float(reward) if reward is not None else 0.01
+                done = step_data.get("done", False)
                 steps_taken = step
                 rewards.append(reward)
 
@@ -196,10 +211,10 @@ def run_task(task_id: str, client: OpenAI) -> None:
                 done = True
                 break
 
+        # Final score
         if rewards:
             score = rewards[-1] if done else clamp_score(sum(rewards) / len(rewards))
         score = clamp_score(score)
-        success = getattr(env.state, 'remediation_successful', False)
 
     except Exception as e:
         score = 0.01
@@ -210,10 +225,10 @@ def run_task(task_id: str, client: OpenAI) -> None:
 
 
 def main() -> None:
-    # Use the platform-injected proxy credentials — this is mandatory
+    # Initialize OpenAI client with platform-injected proxy credentials
     client = OpenAI(
-        base_url=os.environ["API_BASE_URL"],
-        api_key=os.environ["API_KEY"],
+        base_url=API_BASE_URL,
+        api_key=API_KEY,
     )
 
     single_task = os.getenv("CAUSAL_OPS_TASK")
