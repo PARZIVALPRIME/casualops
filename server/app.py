@@ -4,6 +4,8 @@ Uses openenv.core.env_server.create_app for spec compliance.
 A single shared environment instance is used since this env is stateful
 and HTTP requests must share state across reset/step/state calls.
 """
+import os
+
 from openenv.core.env_server import create_app
 
 from env.environment import CausalOpsEnvironment
@@ -29,7 +31,8 @@ def root():
 def main():
     """Entry point for the server script."""
     import uvicorn
-    uvicorn.run("server.app:app", host="0.0.0.0", port=7860, reload=False)
+    port = int(os.environ.get("PORT", "7860"))
+    uvicorn.run("server.app:app", host="0.0.0.0", port=port, reload=False)
 
 if __name__ == "__main__":
     main()
