@@ -30,19 +30,16 @@ from typing import List, Optional
 
 from openai import OpenAI
 
-from client import CausalOpsClient
+from env.environment import CausalOpsEnvironment
 from models import CausalOpsAction, ActionType
 
 # ── Configuration ──────────────────────────────────────────────────────
-# IMPORTANT: The competition platform injects API_BASE_URL and API_KEY
-# to route through their LiteLLM proxy. We MUST use these first.
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 BENCHMARK = "causal_ops"
 MAX_STEPS = 20
 TEMPERATURE = 0.0
 MAX_TOKENS = 256
 
-# Tasks to run — platform sets CAUSAL_OPS_TASK for single-task runs
 ALL_TASKS = [
     "easy_smoking_gun",
     "medium_web_of_lies",
@@ -118,105 +115,93 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
 
 def run_task(task_id: str, client: OpenAI) -> None:
     """Run a single task episode and emit [START]/[STEP]/[END] logs."""
-    
+    env = CausalOpsEnvironment()
+
     log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
 
     rewards: List[float] = []
     steps_taken = 0
-    score = 0.01  # safe default in (0, 1)
+    score = 0.01
     success = False
 
     try:
-        with CausalOpsClient().sync() as env:
-            # Reset with correct keyword argument
-            result = env.reset(task_id=task_id)
-            obs = result.observation
+        obs = env.reset(task_id=task_id)
 
-            messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-            ]
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+        ]
 
-            done = result.done
+        done = obs.done
 
-            for step in range(1, MAX_STEPS + 1):
-                if done:
-                    break
+        for step in range(1, MAX_STEPS + 1):
+            if done:
+                break
 
-                # Build user prompt from current observation
-                obs_summary = {
-                    "step": obs.step_number,
-                    "time_remaining_s": round(obs.time_budget_remaining_s, 1),
-                    "services": obs.services_overview,
-                    "alerts": obs.alerts[:5],
-                    "logs": obs.logs[:10],
-                    "stakeholder_messages": [
-                        {"sender": m.sender, "message": m.message, "requires_response": m.requires_response}
-                        for m in obs.stakeholder_messages
-                    ],
-                    "available_actions": obs.available_actions,
-                    "task_description": obs.task_description,
+            obs_summary = {
+                "step": obs.step_number,
+                "time_remaining_s": round(obs.time_budget_remaining_s, 1),
+                "services": obs.services_overview,
+                "alerts": obs.alerts[:5],
+                "logs": obs.logs[:10],
+                "stakeholder_messages": [
+                    {"sender": m.sender, "message": m.message, "requires_response": m.requires_response}
+                    for m in obs.stakeholder_messages
+                ],
+                "available_actions": obs.available_actions,
+                "task_description": obs.task_description,
+            }
+            if obs.detailed_metrics:
+                obs_summary["detailed_metrics"] = {
+                    k: {"cpu": v.cpu_percent, "latency_ms": v.latency_ms,
+                         "error_rate": v.error_rate, "status": v.status}
+                    for k, v in obs.detailed_metrics.items()
                 }
-                if obs.detailed_metrics:
-                    obs_summary["detailed_metrics"] = {
-                        k: {"cpu": v.cpu_percent, "latency_ms": v.latency_ms,
-                             "error_rate": v.error_rate, "status": v.status}
-                        for k, v in obs.detailed_metrics.items()
-                    }
-                if obs.counterfactual_prompt:
-                    obs_summary["counterfactual_prompt"] = obs.counterfactual_prompt.message
+            if obs.counterfactual_prompt:
+                obs_summary["counterfactual_prompt"] = obs.counterfactual_prompt.message
 
-                messages.append({"role": "user", "content": json.dumps(obs_summary, default=str)})
+            messages.append({"role": "user", "content": json.dumps(obs_summary, default=str)})
 
-                # Get LLM action
-                ai_text = '{"type": "observe", "target": "metrics:database", "detail": ""}'
-                error_msg = None
-                try:
-                    response = client.chat.completions.create(
-                        model=MODEL_NAME,
-                        messages=messages,  # type: ignore
-                        temperature=TEMPERATURE,
-                        max_tokens=MAX_TOKENS,
-                    )
-                    ai_text = response.choices[0].message.content or ai_text
-                except Exception as e:
-                    error_msg = str(e)
+            # Call the LLM through the platform proxy
+            ai_text = '{"type": "observe", "target": "metrics:database", "detail": ""}'
+            error_msg = None
+            try:
+                response = client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=messages,  # type: ignore
+                    temperature=TEMPERATURE,
+                    max_tokens=MAX_TOKENS,
+                )
+                ai_text = response.choices[0].message.content or ai_text
+            except Exception as e:
+                error_msg = str(e)
 
-                messages.append({"role": "assistant", "content": ai_text})
+            messages.append({"role": "assistant", "content": ai_text})
 
-                # Parse and execute action
-                action = parse_action(ai_text)
-                action_str = f"{action.type.value}('{action.target}')"
+            action = parse_action(ai_text)
+            action_str = f"{action.type.value}('{action.target}')"
 
-                try:
-                    # env.step() returns StepResult
-                    result = env.step(action)
-                    obs = result.observation
-                    reward = result.reward if result.reward is not None else 0.01
-                    reward = float(reward)
-                    done = result.done
-                    steps_taken = step
-                    rewards.append(reward)
+            try:
+                # env.step() returns CausalOpsObservation directly
+                obs = env.step(action)
+                reward = float(obs.reward) if obs.reward is not None else 0.01
+                done = obs.done
+                steps_taken = step
+                rewards.append(reward)
 
-                    log_step(step=step, action=action_str, reward=reward, done=done, error=error_msg)
-                    
-                    if done:
-                        state_res = env.state()
-                        success = state_res.state.get("remediation_successful", False) if state_res.state else False
+                log_step(step=step, action=action_str, reward=reward, done=done, error=error_msg)
+            except Exception as e:
+                rewards.append(0.01)
+                steps_taken = step
+                log_step(step=step, action=action_str, reward=0.01, done=True, error=str(e))
+                done = True
+                break
 
-                except Exception as e:
-                    rewards.append(0.01)
-                    steps_taken = step
-                    log_step(step=step, action=action_str, reward=0.01, done=True, error=str(e))
-                    done = True
-                    break
-
-            # Compute final score from the last reward (which is the final grader score when done)
-            if rewards:
-                score = rewards[-1] if done else clamp_score(sum(rewards) / len(rewards))
-            score = clamp_score(score)
+        if rewards:
+            score = rewards[-1] if done else clamp_score(sum(rewards) / len(rewards))
+        score = clamp_score(score)
+        success = getattr(env.state, 'remediation_successful', False)
 
     except Exception as e:
-        # Even on total failure, emit a valid [END] with score in (0, 1)
         score = 0.01
         print(f"[DEBUG] Task {task_id} error: {e}", flush=True)
 
@@ -225,10 +210,12 @@ def run_task(task_id: str, client: OpenAI) -> None:
 
 
 def main() -> None:
-    # Initialize your OpenAI client exactly as requested by the validator
-    client = OpenAI(base_url=os.environ["API_BASE_URL"], api_key=os.environ["API_KEY"])
+    # Use the platform-injected proxy credentials — this is mandatory
+    client = OpenAI(
+        base_url=os.environ["API_BASE_URL"],
+        api_key=os.environ["API_KEY"],
+    )
 
-    # Support single-task via env var (platform sets this) or run all tasks
     single_task = os.getenv("CAUSAL_OPS_TASK")
     if single_task:
         tasks = [single_task]
